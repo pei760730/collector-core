@@ -1,0 +1,29 @@
+name: publish
+
+# 推 v* tag 觸發 → build + 發布到 GitHub Packages 私有 registry。
+# GITHUB_TOKEN 對「自己 repo 的 package」有 packages:write,無需額外 secret。
+# 發版:bump package.json version → 跑 `git tag vX.Y.Z && git push origin vX.Y.Z`。
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch: {}
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@pei760730"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
