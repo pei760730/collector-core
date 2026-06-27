@@ -1,0 +1,101 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { isTransient, withRetry } from "../src/utils/retry.js";
+
+describe("isTransient 暫態判斷", () => {
+  it("429 / 5xx 數字 code 視為暫態", () => {
+    expect(isTransient({ code: 429 })).toBe(true);
+    expect(isTransient({ code: 503 })).toBe(true);
+    expect(isTransient({ response: { status: 502 } })).toBe(true);
+  });
+
+  it("404 / 4xx 非暫態", () => {
+    expect(isTransient({ code: 404 })).toBe(false);
+    expect(isTransient({ response: { status: 400 } })).toBe(false);
+  });
+
+  it("網路型 errno code / 訊息視為暫態(含 superset 的 ENOTFOUND / network)", () => {
+    expect(isTransient({ code: "ECONNRESET" })).toBe(true);
+    expect(isTransient({ code: "ENOTFOUND" })).toBe(true);
+    expect(isTransient({ message: "Premature close" })).toBe(true);
+    expect(isTransient({ message: "socket hang up" })).toBe(true);
+    expect(isTransient(new Error("network error talking to host"))).toBe(true);
+  });
+
+  it("一般錯誤(無暫態 code/訊息)非暫態,維持 fail-fast", () => {
+    expect(isTransient(new Error("表頭不符"))).toBe(false);
+    expect(isTransient({})).toBe(false);
+    expect(isTransient(null)).toBe(false);
+  });
+});
+
+describe("withRetry 退避重試", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("連兩次暫態後成功(假計時器跑完退避)", async () => {
+    let n = 0;
+    const fn = vi.fn(async () => {
+      n += 1;
+      if (n <= 2) throw { code: 503 };
+      return "ok";
+    });
+    const p = withRetry("讀資料", fn);
+    await vi.runAllTimersAsync();
+    await expect(p).resolves.toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
+
+  it("非暫態錯誤立即丟,不重試", async () => {
+    const fn = vi.fn(async () => {
+      throw new Error("表頭不符");
+    });
+    await expect(withRetry("寫表頭", fn)).rejects.toThrow("表頭不符");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("暫態錯誤重試到 tries 用盡後丟", async () => {
+    const fn = vi.fn(async () => {
+      throw { code: 500 };
+    });
+    const p = withRetry("append", fn, { tries: 3 });
+    const assertion = expect(p).rejects.toMatchObject({ code: 500 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(fn).toHaveBeenCalledTimes(3);
+  });
+
+  it("alreadyDone()===true 短路為 resolve undefined(冪等護欄擋雙寫)", async () => {
+    const fn = vi.fn(async () => {
+      throw { code: 503 };
+    });
+    const alreadyDone = vi.fn(async () => true);
+    const p = withRetry("append", fn, { alreadyDone });
+    await vi.runAllTimersAsync();
+    await expect(p).resolves.toBeUndefined();
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(alreadyDone).toHaveBeenCalledTimes(1);
+  });
+
+  it("alreadyDone 自身丟錯則照常重試,不放大故障", async () => {
+    let n = 0;
+    const fn = vi.fn(async () => {
+      n += 1;
+      if (n === 1) throw { code: 503 };
+      return "ok";
+    });
+    const alreadyDone = vi.fn(async () => {
+      throw new Error("護欄查詢失敗");
+    });
+    const p = withRetry("append", fn, { alreadyDone });
+    await vi.runAllTimersAsync();
+    await expect(p).resolves.toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(alreadyDone).toHaveBeenCalledTimes(1);
+  });
+});

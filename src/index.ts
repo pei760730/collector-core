@@ -13,5 +13,6 @@ export * from "./pipeline/groupKey.js";
 export * from "./utils/date.js";
 export * from "./utils/expandUrl.js";
 export * from "./utils/logger.js";
+export * from "./utils/retry.js";
 export * from "./adapter.js";
 export * from "./schema.js";
