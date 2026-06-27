@@ -34,22 +34,41 @@ const MOBILE_TO_DESKTOP: Record<string, string> = {
   "mobile.twitter.com": "twitter.com",
 };
 
-/** 已知短網址服務 host。 */
+/**
+ * 已知短網址服務 host(core 與 feed-collector 兩份必須一致)。
+ * 用途:不展開的話短鏈跟展開後長鏈算出不同去重 key → 漏去重。EXPAND_SHORT_URLS=true 時
+ * 用 expandShortUrl(follow redirect)展開;展開失敗會優雅退回原值(不會更糟)。
+ * 2026-06-27 補台/中常見分享短鏈(實測會 302 到目標):reurl.cc/pse.is/lihi*.cc/s.id/
+ * tiny.cc/rb.gy/cutt.ly,以及 xhslink.com(小紅書分享短鏈,展開成 xiaohongshu.com/explore/<id>)。
+ * 刻意不收:forms.gle(Google 表單)、a.co(Amazon)—— 非影片分享、收了只是徒增展開噪音。
+ */
 const SHORT_URL_HOSTS = new Set([
   "bit.ly",
   "tinyurl.com",
+  "tiny.cc",
   "goo.gl",
   "ow.ly",
   "is.gd",
   "buff.ly",
   "t.co",
   "short.link",
-  // TikTok 短連結:無 /video/<id>,不展開的話跟長連結算出不同去重 key → 漏去重。
-  // EXPAND_SHORT_URLS=true 時展開成正規 /video/ 連結;展開失敗會優雅退回原值(不會更糟)。
+  "cutt.ly",
+  "rb.gy",
+  "s.id",
+  // 台灣常見分享短鏈(reurl / PicSee / lihi)
+  "reurl.cc",
+  "pse.is",
+  "lihi.cc",
+  "lihi1.cc",
+  "lihi2.cc",
+  "lihi3.cc",
+  // TikTok 短連結:無 /video/<id>,展開成正規 /video/ 連結才抽得到 id。
   "vm.tiktok.com",
   "vt.tiktok.com",
   // 抖音 App 分享短連結:展開成 douyin.com/video/<id> 才抽得到 douyin_<id> 去重。
   "v.douyin.com",
+  // 小紅書分享短鏈:展開成 xiaohongshu.com/explore/<hex> 才抽得到 xhs_<hex> 去重。
+  "xhslink.com",
 ]);
 
 /**

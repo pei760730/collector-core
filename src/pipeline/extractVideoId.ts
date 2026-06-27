@@ -18,104 +18,109 @@ function firstMatch(url: string, patterns: RegExp[]): string | null {
   return null;
 }
 
-const TIKTOK_PATTERNS = [
-  /video\/(\d+)/,
-  /item_id=(\d+)/,
-  // 只認「路徑段」的 19 位純數字 video id(如 vt.tiktok.com/<19位>):前面要有 `/`、
-  // 後面不接數字。否則 ?sec_uid=<19位>(query)、20 位數字截前 19 位 會被偽造成假影片 id。
-  // discover/ 搜尋頁不是影片,移除其規則 → 落到 unknown_*/unsupported,不混進真影片。
-  /\/(\d{19})(?!\d)/,
-];
-// reel / reels(複數)/ p / tv(IGTV 舊形態)—— 對齊引擎 voc normalize `(?:reels?|p|tv)`。
-// 補 tv/reels(2026-06-26 canonical):原缺 tv → IGTV 連結落 unknown 退路徑,與引擎分群不一致(dedup_vectors 釘住)。
+// Task1(2026-06-27):path 型 id pattern 只比對 **host+pathname**(不吃 query),擋
+// `?redirect=/video/<n>`、`?ref=/videos/<n>`、`?from=/reel/<code>` 之類 query 注入造假 id。
+// 合法的 query id(YouTube `?v=`、Facebook `story_fbid`/`v`)另以白名單從 searchParams 抽。
+// TikTok 只認 path /video/<id>:item_id=(query 注入面)、裸 19 碼(真實短碼非純數字)2026-06-27 砍除。
+const TIKTOK_PATTERNS = [/\/video\/(\d+)/];
+// reel / reels(複數)/ p / tv(IGTV 舊形態)—— 對齊引擎 voc/tbvoc normalize `(?:reels?|p|tv)`。
 const INSTAGRAM_PATTERNS = [/\/(reels?|p|tv)\/([a-zA-Z0-9_-]+)/];
-// 只認真正帶影片 id 的形態 —— 不要用裸 `/([11])`,否則 /channel/UC… 之類會被誤抓。
-// 結尾 (?![a-zA-Z0-9_-]) 右邊界:YouTube ID 恰 11 碼。沒邊界時非 11 碼(如 12 碼)
-// 會被「靜默吃前 11 碼」造出截斷的錯 id;有邊界 → 非 11 碼整段不命中 → 落 unknown_*(同 TikTok 19 碼邊界的教訓)。
-const YOUTUBE_PATTERNS = [
+// YouTube path 型形態(shorts/youtu.be/embed/live);watch?v= 走 query 白名單(見 youtubeQueryId)。
+// 結尾 (?![a-zA-Z0-9_-]) 右邊界:YouTube ID 恰 11 碼。非 11 碼(如 12 碼)整段不命中 → 落 unsupported。
+const YOUTUBE_PATH_PATTERNS = [
   /shorts\/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/,
-  /[?&]v=([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/,
   /youtu\.be\/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/,
   /\/embed\/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/,
   /\/live\/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/,
 ];
-// 小紅書筆記兩種正規路徑:/explore/<id> 與 /discovery/item/<id>(分享連結常見後者)。
-// id 收緊成小寫 hex(2026-06-26 canonical):真實小紅書 id 是 24 碼小寫 hex,原 [a-zA-Z0-9] 過寬
-// 會把非 hex 尾段一起吞 → 與引擎(hex)分群不一致。對齊引擎 voc normalize 的 [a-f0-9]。
+const YOUTUBE_V_ID = /^[a-zA-Z0-9_-]{11}$/;
+// 小紅書筆記兩種正規路徑:/explore/<id> 與 /discovery/item/<id>。id 收緊成小寫 hex
+// (真實小紅書 id 是 24 碼小寫 hex)。對齊引擎 voc/tbvoc normalize 的 [a-f0-9]。
 const XHS_PATTERNS = [/\/explore\/([a-f0-9]+)/, /\/discovery\/item\/([a-f0-9]+)/];
 const THREADS_PATTERNS = [/\/post\/([a-zA-Z0-9_-]+)/];
 // X(Twitter)推文 id(port 自 yt-dlp TwitterIE):/status/<數字>。涵蓋 /user/status/、i/web/status/。
 const X_PATTERNS = [/\/status\/(\d+)/];
-// 抖音(Douyin = TikTok 中國版,同 19 位數字 id 制;port 自 yt-dlp DouyinIE):
-// /video/<id> 優先;退 19 位純數字路徑(同 TikTok,擋 query/截斷偽造)。短連結 v.douyin.com 需展開,非此處負責。
-const DOUYIN_PATTERNS = [/\/video\/(\d+)/, /\/(\d{19})(?!\d)/];
+// 抖音(Douyin = TikTok 中國版;port 自 yt-dlp DouyinIE):只認 path /video/<id>
+// (裸 19 碼 2026-06-27 砍除,同 TikTok)。短連結 v.douyin.com 需展開,非此處負責。
+const DOUYIN_PATTERNS = [/\/video\/(\d+)/];
 
-/**
- * Facebook 抽 ID(port 自 feed-collector;比 n8n 版「Facebook 一律 unknown」強)。
- * 四種形態依序試,各帶不同前綴讓 dedup key 不互撞(前綴只進去重 key,不寫 Sheet):
- *   A. fb.watch/<code>            → fbw_
- *   B. /(reel|reels|videos)/<n>   → fb_
- *   C. /share/[rvp]/<code>        → fbs_
- *   D. query story_fbid 或 v      → fb_
- * 四種都不中(如純個人頁 / 社團)→ 回 null,退 unknown_ + 連結路徑去重(行為同舊版)。
- */
-function extractFacebook(url: string): string | null {
-  const fbw = url.match(/fb\.watch\/([A-Za-z0-9_-]+)/);
-  if (fbw) return `fbw_${fbw[1]}`;
-  const vids = url.match(/\/(?:reel|reels|videos)\/(\d+)/);
-  if (vids) return `fb_${vids[1]}`;
-  const share = url.match(/\/share\/[rvp]\/([A-Za-z0-9_-]+)/);
-  if (share) return `fbs_${share[1]}`;
+/** 把乾淨網址拆成 host+pathname(去 query/fragment)與 searchParams。非合法 URL → 字串退路。 */
+function splitUrl(url: string): { pathPart: string; params: URLSearchParams | null } {
   try {
     const u = new URL(url);
-    const story = u.searchParams.get("story_fbid") ?? u.searchParams.get("v");
-    if (story) return `fb_${story}`;
+    return { pathPart: `${u.host}${u.pathname}`, params: u.searchParams };
   } catch {
-    /* 非合法 URL → 跳過 query 形態 */
+    return { pathPart: url.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "").replace(/[?#].*$/, ""), params: null };
   }
+}
+
+/** YouTube watch?v= 走 query 白名單:取 top-level `v`、且恰 11 碼才算(非 11 碼不抽,落 unsupported)。 */
+function youtubeQueryId(params: URLSearchParams | null): string | null {
+  const v = params?.get("v") ?? "";
+  return YOUTUBE_V_ID.test(v) ? v : null;
+}
+
+/**
+ * Facebook 抽 ID(比 n8n 版「Facebook 一律 unknown」強)。
+ * 四種形態依序試,各帶不同前綴讓 dedup key 不互撞(前綴只進去重 key,不寫 Sheet):
+ *   A. fb.watch/<code>            → fbw_   (host+pathname)
+ *   B. /(reel|reels|videos)/<n>   → fb_    (host+pathname)
+ *   C. /share/[rvp]/<code>        → fbs_   (host+pathname)
+ *   D. query story_fbid 或 v      → fb_    (query 白名單)
+ * 四種都不中(如純個人頁 / 社團)→ 回 null,退 unknown_ + 連結路徑去重。
+ */
+function extractFacebook(pathPart: string, params: URLSearchParams | null): string | null {
+  const fbw = pathPart.match(/fb\.watch\/([A-Za-z0-9_-]+)/);
+  if (fbw) return `fbw_${fbw[1]}`;
+  const vids = pathPart.match(/\/(?:reel|reels|videos)\/(\d+)/);
+  if (vids) return `fb_${vids[1]}`;
+  const share = pathPart.match(/\/share\/[rvp]\/([A-Za-z0-9_-]+)/);
+  if (share) return `fbs_${share[1]}`;
+  const story = params?.get("story_fbid") ?? params?.get("v");
+  if (story) return `fb_${story}`;
   return null;
 }
 
 export function extractVideoId(platform: Platform, cleanUrl: string): VideoIdInfo {
-  const url = cleanUrl ?? "";
+  const { pathPart, params } = splitUrl(cleanUrl ?? "");
   let raw: string | null = null;
   let prefix = "";
 
   switch (platform) {
     case "TikTok":
       prefix = "tiktok";
-      raw = firstMatch(url, TIKTOK_PATTERNS);
+      raw = firstMatch(pathPart, TIKTOK_PATTERNS);
       break;
     case "Instagram":
       prefix = "ig";
-      raw = firstMatch(url, INSTAGRAM_PATTERNS);
+      raw = firstMatch(pathPart, INSTAGRAM_PATTERNS);
       break;
     case "YouTube":
       prefix = "yt";
-      raw = firstMatch(url, YOUTUBE_PATTERNS);
+      raw = firstMatch(pathPart, YOUTUBE_PATH_PATTERNS) ?? youtubeQueryId(params);
       break;
     case "小紅書":
       prefix = "xhs";
-      raw = firstMatch(url, XHS_PATTERNS);
+      raw = firstMatch(pathPart, XHS_PATTERNS);
       break;
     case "Threads":
       prefix = "threads";
-      raw = firstMatch(url, THREADS_PATTERNS);
+      raw = firstMatch(pathPart, THREADS_PATTERNS);
       break;
     case "Facebook": {
       // FB id 已自帶前綴(fbw_/fb_/fbs_)→ 直接回,不再套 `${prefix}_`。
-      const fbId = extractFacebook(url);
+      const fbId = extractFacebook(pathPart, params);
       if (fbId) return { videoId: fbId, unsupported: false };
       raw = null; // 四形態皆不中 → 退 unknown_
       break;
     }
     case "X":
       prefix = "x";
-      raw = firstMatch(url, X_PATTERNS);
+      raw = firstMatch(pathPart, X_PATTERNS);
       break;
     case "抖音":
       prefix = "douyin";
-      raw = firstMatch(url, DOUYIN_PATTERNS);
+      raw = firstMatch(pathPart, DOUYIN_PATTERNS);
       break;
     // 其餘(Unknown 等):無抽取規則 → 視為不支援,去重退連結路徑 key
     default:

@@ -38,6 +38,15 @@ describe("cleanUrl", () => {
     expect(cleanUrl("https://vt.tiktok.com/ZSabc/").isShortUrl).toBe(true);
     // 抖音 App 分享短連結同理。
     expect(cleanUrl("https://v.douyin.com/iAbCdEf/").isShortUrl).toBe(true);
+    // 2026-06-27 補:小紅書分享短鏈 + 台/中常見分享短鏈(實測會 302 到目標)。
+    expect(cleanUrl("https://xhslink.com/a/AbC123").isShortUrl).toBe(true);
+    expect(cleanUrl("https://reurl.cc/AbC123").isShortUrl).toBe(true);
+    expect(cleanUrl("https://pse.is/ABCDEF").isShortUrl).toBe(true);
+    expect(cleanUrl("https://lihi3.cc/AbCdE").isShortUrl).toBe(true);
+    expect(cleanUrl("https://s.id/abcde").isShortUrl).toBe(true);
+    // 刻意不收的非影片分享短鏈 → false。
+    expect(cleanUrl("https://forms.gle/AbCdEf").isShortUrl).toBe(false);
+    expect(cleanUrl("https://a.co/d/abcDEf").isShortUrl).toBe(false);
   });
 
   it("只移除追蹤參數後不留空 ?", () => {
