@@ -1,6 +1,6 @@
 {
   "name": "@pei760730/collector-core",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "description": "三個短影音收集 collector 的共用核心 —— 純 pipeline + utils + adapter 契約 + loadEngineSchema",
   "type": "module",
   "main": "./dist/index.js",
@@ -9,10 +9,12 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
-    }
+    },
+    "./contracts/voc/dedup_vectors.json": "./contracts/voc/dedup_vectors.json"
   },
   "files": [
-    "dist"
+    "dist",
+    "contracts"
   ],
   "engines": {
     "node": ">=20"
