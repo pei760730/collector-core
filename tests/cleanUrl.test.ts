@@ -43,6 +43,9 @@ describe("cleanUrl", () => {
     expect(cleanUrl("https://reurl.cc/AbC123").isShortUrl).toBe(true);
     expect(cleanUrl("https://pse.is/ABCDEF").isShortUrl).toBe(true);
     expect(cleanUrl("https://lihi3.cc/AbCdE").isShortUrl).toBe(true);
+    expect(cleanUrl("https://lihi.io/AbCdE").isShortUrl).toBe(true);
+    expect(cleanUrl("https://pros.is/ABCDEF").isShortUrl).toBe(true);
+    expect(cleanUrl("https://myppt.cc/AbCdE").isShortUrl).toBe(true);
     expect(cleanUrl("https://s.id/abcde").isShortUrl).toBe(true);
     // 刻意不收的非影片分享短鏈 → false。
     expect(cleanUrl("https://forms.gle/AbCdEf").isShortUrl).toBe(false);

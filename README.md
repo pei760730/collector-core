@@ -27,3 +27,14 @@ npm test
 ```
 
 GitHub Packages 私有 registry 發布(`@pei760730` scope)。
+
+## 發版(改 pipeline / 去重規則後)
+
+消費端 sv-bot / clip 透過 git tag pin(`github:pei760730/collector-core#vX.Y.Z`),core 是 git dep、
+靠 `prepare`(`npm run build`)在安裝時重建 `dist/`(dist **不進 git**)。發新版:
+
+1. `package.json` 的 `version` bump(例 0.1.3 → 0.1.4),commit。
+2. `npm run release`(`scripts/release.mjs`):驗 tree 乾淨 + build + test → 打 annotated tag `v<version>`、push 分支 + tag。**tag 與 version 永遠同步**(舊流程手動脫鉤過、卡過 lock)。
+3. sv-bot / clip 把 dep 改 `#v<version>`,**surgical 編輯 `package-lock.json`**(還原 origin/main 全平台 lock,只 sed 換 collector-core 的 git ref + version)。**別在 macOS `rm` 重生 lock** —— 會掉 `@rollup/rollup-linux-x64-gnu` optional dep(npm/cli#4828)→ linux CI 啟動失敗。
+
+> tag 衛生:core PR 多為 squash-merge,tag 會指向 merge 前的分支 commit(內容相同 → dep 解析 OK)。下次改 core 從 main HEAD 重發**新版號**,別接舊 tag commit 繼續長。

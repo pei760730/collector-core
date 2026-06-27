@@ -55,13 +55,18 @@ const SHORT_URL_HOSTS = new Set([
   "cutt.ly",
   "rb.gy",
   "s.id",
-  // 台灣常見分享短鏈(reurl / PicSee / lihi)
+  // 台灣常見分享短鏈(reurl / PicSee / lihi 全網域;實測會 302 到目標)
   "reurl.cc",
   "pse.is",
+  "pros.is",
   "lihi.cc",
   "lihi1.cc",
   "lihi2.cc",
   "lihi3.cc",
+  "lihi.io",
+  "lihi.biz",
+  "lihi.tv",
+  "myppt.cc",
   // TikTok 短連結:無 /video/<id>,展開成正規 /video/ 連結才抽得到 id。
   "vm.tiktok.com",
   "vt.tiktok.com",
