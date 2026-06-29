@@ -26,6 +26,17 @@ describe("groupKey 分群", () => {
     );
   });
 
+  it("XHS 大寫 hex id 不截斷、收斂成與小寫同群(i flag,2026-06-29 修)", () => {
+    // 缺 i flag 時大寫會在第一個非 a-f 字母截斷成 xhs_663 → 不同筆記假合併。
+    expect(groupKey("https://www.xiaohongshu.com/explore/663ED2B2000000001E0102A3")).toBe(
+      "xhs_663ed2b2000000001e0102a3",
+    );
+    // 兩支前綴相同但實際不同的大寫 id 必須分群(回歸防護:不可塌成 xhs_663)。
+    const a = groupKey("https://www.xiaohongshu.com/explore/663ED2B2000000001E0102A3");
+    const b = groupKey("https://www.xiaohongshu.com/explore/663FFFFF000000001E0102A3");
+    expect(a).not.toBe(b);
+  });
+
   it("YT 非 11 碼(畸形)退路徑 key(11碼右邊界,對齊引擎)", () => {
     expect(groupKey("https://youtu.be/dQw4w9WgXcQX")).toBe("https://youtu.be/dqw4w9wgxcqx");
     expect(groupKey("https://youtu.be/abc123")).toBe("https://youtu.be/abc123");

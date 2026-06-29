@@ -34,9 +34,11 @@ const YOUTUBE_PATH_PATTERNS = [
   /\/live\/([a-zA-Z0-9_-]{11})(?![a-zA-Z0-9_-])/,
 ];
 const YOUTUBE_V_ID = /^[a-zA-Z0-9_-]{11}$/;
-// 小紅書筆記兩種正規路徑:/explore/<id> 與 /discovery/item/<id>。id 收緊成小寫 hex
-// (真實小紅書 id 是 24 碼小寫 hex)。對齊引擎 voc/tbvoc normalize 的 [a-f0-9]。
-const XHS_PATTERNS = [/\/explore\/([a-f0-9]+)/, /\/discovery\/item\/([a-f0-9]+)/];
+// 小紅書筆記兩種正規路徑:/explore/<id> 與 /discovery/item/<id>。id 是 24 碼 hex
+// (真實 id 為小寫,但 share 工具偶有大寫)。`i` flag 對齊引擎 voc/tbvoc normalize 的
+// `[a-f0-9]` + `re.I`:大寫 hex 整段抽(再由 groupKey 的 toLowerCase 收斂),避免遇大寫字母
+// 截斷成殘 id → 兩支不同筆記假合併成同群(2026-06-29 修)。
+const XHS_PATTERNS = [/\/explore\/([a-f0-9]+)/i, /\/discovery\/item\/([a-f0-9]+)/i];
 const THREADS_PATTERNS = [/\/post\/([a-zA-Z0-9_-]+)/];
 // X(Twitter)推文 id(port 自 yt-dlp TwitterIE):/status/<數字>。涵蓋 /user/status/、i/web/status/。
 const X_PATTERNS = [/\/status\/(\d+)/];
