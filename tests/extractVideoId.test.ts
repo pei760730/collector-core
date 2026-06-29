@@ -79,6 +79,14 @@ describe("extractVideoId", () => {
     ).toBe("xhs_def456");
   });
 
+  it("小紅書 大寫 hex id 整段抽不截斷(i flag,2026-06-29 修)", () => {
+    // 缺 i flag 時 663ED2B2… 會在 E 截斷成 xhs_663;有 i 則整段抽(大小寫由 groupKey 收斂)。
+    expect(
+      extractVideoId("小紅書", "https://www.xiaohongshu.com/explore/663ED2B2000000001E0102A3")
+        .videoId,
+    ).toBe("xhs_663ED2B2000000001E0102A3");
+  });
+
   it("Facebook fb.watch/<code> → fbw_", () => {
     const r = extractVideoId("Facebook", "https://fb.watch/xyz");
     expect(r.unsupported).toBe(false);

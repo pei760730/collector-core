@@ -1,6 +1,9 @@
 /**
  * loadEngineSchema —— 把引擎 schema.json(已 JSON.parse 的物件)驗證 + 型別化成 EngineSchema。
  *
+ * @experimental 預備設計,目前無消費端、未從 index.ts 對外 export(見 index.ts 註)。單元測試
+ * (tests/loadEngineSchema.test.ts)直接 import 本檔保留覆蓋;接通前不算公開契約。
+ *
  * 取代各 collector 手抄鏡像常數(POOL_COLUMNS / contract.test.ts):collector buildtime 嵌入引擎
  * 發布的 schema.json,過這支驗證後拿到型別化 schema。staging 缺 statusField/crossTab 直接丟錯
  * (型別 + runtime 雙保險,確保 staging 不可塌成 direct)。

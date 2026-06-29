@@ -1,6 +1,9 @@
 /**
  * collector adapter 契約(型別層)。
  *
+ * @experimental 預備設計,目前無消費端、未從 index.ts 對外 export(見 index.ts 註)。staging
+ * 統一化接通前不算公開契約;改動不視為 breaking。
+ *
  * core 只提供「全引擎事實一致」的純 pipeline + runtime;per-engine 差異(寫入模型 / schema 欄位 /
  * dedup / STATUS)一律收斂在各 collector 的 adapter,實作這份契約。
  *
