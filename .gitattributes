@@ -1,0 +1,4 @@
+# 契約檔強制 LF:contracts/voc/dedup_vectors.json 是跨語言 dedup 契約的 canonical 源頭,
+# 下游引擎的 drift-guard 用它的 md5 當指紋。Windows autocrlf 會把 checkout 變 CRLF → md5 不符
+# → 本機假紅。eol=lf 讓任何平台 checkout 都是 LF。
+contracts/**/*.json text eol=lf
