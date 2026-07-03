@@ -4,10 +4,8 @@
  * 純 pipeline(parse/cleanUrl/detectPlatform/extractVideoId/groupKey)+ utils(date/expandUrl/logger)。
  * per-engine 差異留各 collector 的 adapter。
  *
- * 註:adapter.ts(寫入模型 discriminated union)+ schema.ts(loadEngineSchema)為 staging 統一化的
- * **預備設計,目前無任何消費端**(svb/clip 各自本地定義 EngineSchema、of-content-engine 未依賴 core;
- * staging pipeline 抽取 PR-7 已判定不做)。為免看似生效中的公開契約,2026-06-29 移出主 export 表面;
- * 檔案與單元測試保留供未來接通,需要時直接 `import` 自 `./adapter.js` / `./schema.js`。
+ * 註:adapter.ts + schema.ts(staging 統一化預備設計)已於 2026-07-03 解散——PR-7 判不做、
+ * 零消費端、「供未來接通」不是保留理由(Step 2:降級≠解散)。真要接通時 git 歷史(≤v0.2.2)就是備份。
  */
 export * from "./types.js";
 export * from "./pipeline/parse.js";

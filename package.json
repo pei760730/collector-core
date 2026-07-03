@@ -1,7 +1,7 @@
 {
   "name": "@pei760730/collector-core",
   "version": "0.2.2",
-  "description": "三個短影音收集 collector 的共用核心 —— 純 pipeline + utils(adapter/schema 為未接通預備設計)",
+  "description": "三個短影音收集 collector 的共用核心 —— 純 pipeline + utils",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -18,9 +18,6 @@
   ],
   "engines": {
     "node": ">=20"
-  },
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "prepare": "npm run build",

@@ -10,8 +10,8 @@
 
 - **pipeline**(純函式,無 I/O):`parseMessage` · `cleanUrl` · `detectPlatform` · `extractVideoId` · `groupKey`
 - **utils**:`todayIsoTaipei`/`parseSheetDate`/`ageInDays`(Asia/Taipei)· `expandShortUrl` · `logger`
-- **adapter 契約**(型別層):`CollectorAdapter` / `EngineSchema` / `Storage` —— direct / staging 用 discriminated union 鎖死,staging 不可塌成 direct
-- **`loadEngineSchema(json)`**:把引擎發布的 schema.json 驗證 + 型別化(取代各 repo 手抄鏡像常數)
+
+> adapter 契約 / `loadEngineSchema`(staging 統一化預備設計)已於 2026-07-03 解散:PR-7 判不做、零消費端。要復活從 git 歷史(≤v0.2.2)撈。
 
 ## 不變式
 
@@ -26,7 +26,7 @@ npm run typecheck
 npm test
 ```
 
-GitHub Packages 私有 registry 發布(`@pei760730` scope)。
+消費端全走 git dep(tag pin),不經 registry — GitHub Packages publish 鏈已於 2026-07-03 解散(零安裝者)。
 
 ## 發版(改 pipeline / 去重規則後)
 
