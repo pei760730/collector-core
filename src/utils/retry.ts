@@ -32,7 +32,9 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   opts: { tries?: number; alreadyDone?: () => Promise<boolean> } = {},
 ): Promise<T> {
-  const tries = opts?.tries ?? 4;
+  // tries 至少 1:呼叫端傳 0 / 負數(邊界/誤用)時,若不夾住則迴圈一次都不跑、
+  // 最後 `throw lastErr` 會丟出 undefined(非 Error),極難追。夾到 1 保證 fn 至少執行一次。
+  const tries = Math.max(1, Math.trunc(opts?.tries ?? 4));
   let lastErr: unknown;
   for (let attempt = 1; attempt <= tries; attempt++) {
     try {
