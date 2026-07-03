@@ -82,6 +82,27 @@ describe("withRetry 退避重試", () => {
     expect(alreadyDone).toHaveBeenCalledTimes(1);
   });
 
+  it("tries=1:只執行一次、暫態錯誤直接丟原錯(不吞成 undefined)", async () => {
+    const fn = vi.fn(async () => {
+      throw { code: 503 };
+    });
+    await expect(withRetry("t1", fn, { tries: 1 })).rejects.toMatchObject({ code: 503 });
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("tries<=0(邊界/誤用)夾到至少一次執行,不丟出 undefined", async () => {
+    // 未夾住時迴圈一次都不跑 → 最後 `throw lastErr` 丟出 undefined(非 Error)極難追。
+    const ok = vi.fn(async () => "ok");
+    await expect(withRetry("t0", ok, { tries: 0 })).resolves.toBe("ok");
+    expect(ok).toHaveBeenCalledTimes(1);
+
+    const boom = vi.fn(async () => {
+      throw new Error("boom");
+    });
+    await expect(withRetry("tneg", boom, { tries: -5 })).rejects.toThrow("boom");
+    expect(boom).toHaveBeenCalledTimes(1);
+  });
+
   it("alreadyDone 自身丟錯則照常重試,不放大故障", async () => {
     let n = 0;
     const fn = vi.fn(async () => {
