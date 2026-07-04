@@ -30,11 +30,17 @@ npm test
 
 ## 發版(改 pipeline / 去重規則後)
 
-消費端 sv-bot / clip 透過 git tag pin(`github:pei760730/collector-core#vX.Y.Z`),core 是 git dep、
+消費端 sv-bot / clip / feed 透過 git tag pin(`github:pei760730/collector-core#vX.Y.Z`),core 是 git dep、
 靠 `prepare`(`npm run build`)在安裝時重建 `dist/`(dist **不進 git**)。發新版:
 
 1. `package.json` 的 `version` bump(例 0.1.3 → 0.1.4),commit。
 2. `npm run release`(`scripts/release.mjs`):驗 tree 乾淨 + build + test → 打 annotated tag `v<version>`、push 分支 + tag。**tag 與 version 永遠同步**(舊流程手動脫鉤過、卡過 lock)。
-3. sv-bot / clip 把 dep 改 `#v<version>`,**surgical 編輯 `package-lock.json`**(還原 origin/main 全平台 lock,只 sed 換 collector-core 的 git ref + version)。**別在 macOS `rm` 重生 lock** —— 會掉 `@rollup/rollup-linux-x64-gnu` optional dep(npm/cli#4828)→ linux CI 啟動失敗。
+3. sv-bot / clip / feed 把 dep 改 `#v<version>`,**surgical 編輯 `package-lock.json`**(還原 origin/main 全平台 lock,只 sed 換 collector-core 的 git ref + version)。**別在 macOS `rm` 重生 lock** —— 會掉 `@rollup/rollup-linux-x64-gnu` optional dep(npm/cli#4828)→ linux CI 啟動失敗。
+
+> ⚠️ **lock 的 resolved 是 commit hash,不是 tag。**
+> **觸發條件:** 消費端 bump core 版本、或任何「sed 換 `#vX.Y.Z`」式的 git-dep 升版。
+> **教訓:** 只換 spec 字串時 resolved 仍釘舊 commit,`npm ci` 會**靜默裝舊版且 CI 全綠**(npm 不離線驗 tag↔hash)。bump 必須連 resolved hash(新 tag 的 commit)+ lock 內 version 一起換,並以「`npm ci` 後實裝 version === spec tag」驗收。
+> **證據:** 2026-07-04 三消費端 spec=`#v0.2.2`、lock resolved=`95429dc`(v0.2.1)、生產 collect.yml 實跑 v0.2.1(svb #49 / clip #29 / feed #28 三 PR 同型)。
+> **失效/複審條件:** 三消費端 CI 都上了「宣稱==實裝」守門後,此條降級為背景說明;若日後改回 registry 發行(publish 鏈復活),此條整段作廢。
 
 > tag 衛生:core PR 多為 squash-merge,tag 會指向 merge 前的分支 commit(內容相同 → dep 解析 OK)。下次改 core 從 main HEAD 重發**新版號**,別接舊 tag commit 繼續長。
