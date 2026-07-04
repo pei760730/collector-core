@@ -2,8 +2,8 @@
  * collector-core 共用型別(引擎無關)。
  *
  * 只放「三個 collector 共通、與下游引擎無關」的純型別 —— 平台判定、各 pipeline 階段輸出。
- * 與引擎綁定的東西(參考池 RefRow / 暫存區 StagingRow / schema 欄位)不在這裡,留各 collector 的
- * adapter(見 adapter.ts 契約 + 各 repo 的 schema.json)。
+ * 與引擎綁定的東西(參考池 RefRow / 暫存區 StagingRow / schema 欄位)不在這裡 ——
+ * adapter 預備設計已解散(PR #12),per-engine 型別留在各 collector 自己的 repo。
  */
 
 /** 支援的平台(內部判定用顯示名;寫進 Sheet 的小寫碼見 PLATFORM_CODE)。 */
