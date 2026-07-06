@@ -95,14 +95,17 @@ jobs:
           git add package.json package-lock.json
           git commit -m "chore: bump collector-core v$CUR→v$NEW_V(cron 自動開單)"
           git push -f origin "$BR"
-          BODY="自動 bump(core-bump cron 開單,merge 等 owner 授權)。
-
-- collector-core \`v$CUR\` → \`v$NEW_V\`
-- lock resolved sha = \`$NEW_SHA\`(= tag v$NEW_V 的 commit;workflow 內已 npm ci 反向驗證宣稱==實裝)
-- 變更內容:https://github.com/$CORE_REPO/compare/v$CUR...v$NEW_V
-- CI 由 bump workflow dispatch 補跑(GITHUB_TOKEN 開的 PR 不自動觸發 pull_request)"
+          # PR body 逐行 echo 進檔(YAML block scalar 裡放頂格多行字串會炸縮排,別改回 heredoc/多行變數)
+          {
+            echo "自動 bump(core-bump cron 開單,merge 等 owner 授權)。"
+            echo ""
+            echo "- collector-core \`v$CUR\` → \`v$NEW_V\`"
+            echo "- lock resolved sha = \`$NEW_SHA\`(= tag v$NEW_V 的 commit;workflow 內已 npm ci 反向驗證宣稱==實裝)"
+            echo "- 變更內容:https://github.com/$CORE_REPO/compare/v$CUR...v$NEW_V"
+            echo "- CI 由 bump workflow dispatch 補跑(GITHUB_TOKEN 開的 PR 不自動觸發 pull_request)"
+          } > /tmp/pr-body.md
           URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BR" \
-            --title "chore: bump collector-core v$CUR→v$NEW_V" --body "$BODY")
+            --title "chore: bump collector-core v$CUR→v$NEW_V" --body-file /tmp/pr-body.md)
           echo "url=$URL" >> "$GITHUB_OUTPUT"
           gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BR"
 
