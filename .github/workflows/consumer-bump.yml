@@ -29,8 +29,9 @@ jobs:
           CUR=$(node -p '(((require("./package.json").dependencies||{})[process.env.DEP_NAME]||"").match(/#v(.+)$/)||[])[1]||""')
           if [ -z "$CUR" ]; then echo "非 git-tag dep,跳過"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           git ls-remote "https://github.com/$CORE_REPO.git" 'refs/tags/v*' > /tmp/tags.txt
-          # annotated tag 要取 peeled(^{})的 commit sha,lightweight 直接用 ref 的 sha
-          LINE=$(awk '{sha=$1; ref=$2; peeled=(ref ~ /\^\{\}$/); sub(/\^\{\}$/,"",ref); sub(/^refs\/tags\//,"",ref); if (peeled) p[ref]=sha; else t[ref]=sha} END {for (r in t) print (r in p ? p[r] : t[r]), r}' /tmp/tags.txt | sort -k2,2 -V | tail -1)
+          # annotated tag 要取 peeled(^{})的 commit sha,lightweight 直接用 ref 的 sha。
+          # 用 index/substr 不用 regex 比對 ^{}:mawk(ubuntu 預設)對 \{ 跳脫行為與 gawk 不一致。
+          LINE=$(awk '{sha=$1; ref=substr($2,11); if (index(ref,"^{}")>0) {p[substr(ref,1,length(ref)-3)]=sha} else {t[ref]=sha}} END {for (r in t) print (r in p ? p[r] : t[r]), r}' /tmp/tags.txt | sort -k2,2 -V | tail -1)
           SHA=$(echo "$LINE" | cut -d' ' -f1)
           LATEST=$(echo "$LINE" | cut -d' ' -f2 | sed 's/^v//')
           echo "目前 v$CUR,最新 v$LATEST(commit $SHA)"
