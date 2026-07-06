@@ -36,6 +36,7 @@ npm test
 1. `package.json` 的 `version` bump(例 0.1.3 → 0.1.4),commit。
 2. `npm run release`(`scripts/release.mjs`):驗 tree 乾淨 + build + test → 打 annotated tag `v<version>`、push 分支 + tag。**tag 與 version 永遠同步**(舊流程手動脫鉤過、卡過 lock)。
 3. sv-bot / clip / feed 把 dep 改 `#v<version>`,**surgical 編輯 `package-lock.json`**(還原 origin/main 全平台 lock,只 sed 換 collector-core 的 git ref + version)。**別在 macOS `rm` 重生 lock** —— 會掉 `@rollup/rollup-linux-x64-gnu` optional dep(npm/cli#4828)→ linux CI 啟動失敗。
+   **本步已自動化(2026-07-06)**:三消費端各有 `.github/workflows/core-bump.yml` 每日 cron 呼叫本 repo 的 reusable workflow `consumer-bump.yml`(bump 邏輯 SSOT 在 core,消費端只放薄 caller)——偵測新 tag → surgical 編輯 → npm ci 反向驗證宣稱==實裝 → 自動開 bump PR(body 附 resolved sha)+ dispatch 消費端 CI + kai-notify 通知;**merge 仍等 owner 授權**。日常發版後不必手動 bump;急件或 cron 被節流時到消費 repo `gh workflow run core-bump.yml` 手動觸發。
 
 > 背景說明(2026-07-04 事故,已由 CI 守門封死):lock 的 `resolved` 是 **commit hash,不是 tag** —— 只換 spec 字串時 `npm ci` 會靜默裝舊版且全綠(svb #49 / clip #29 / feed #28 三邊同型實證)。所以步驟 3 的 surgical 編輯必須 spec、lock 的 resolved(新 tag 的 commit)、lock 內 version 三處一起換。此不變式現由三消費端 CI 的「宣稱==實裝」守門機器強制(svb / clip / feed 各自 `ci.yml`,2026-07-04 上線、紅→綠反向驗證)—— 漏改會在 PR 直接紅,不靠執行者記得。若日後改回 registry 發行(publish 鏈復活),本段作廢。
 
