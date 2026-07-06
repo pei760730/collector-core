@@ -1,0 +1,129 @@
+name: consumer-bump (reusable)
+
+# 消費端(sv-bot / clip / feed)的 collector-core 自動 bump——單一實作放 core(SSOT,避免三份殼各自漂移)。
+# 呼叫方式:各消費 repo 的 .github/workflows/core-bump.yml 每日 cron `uses` 本 workflow(secrets: inherit)。
+# 行為:偵測 core 最新 tag → 照 README 發版節 surgical 編輯 lock(spec / resolved / version 三處,不重生 lock)
+#      → npm ci 反向驗證宣稱==實裝 → 開 bump PR(body 附 resolved sha)→ dispatch 消費端 ci.yml → kai-notify。
+# 為什麼要自己 dispatch CI:GITHUB_TOKEN 開的 PR 不會觸發 pull_request workflow(GitHub 防遞迴),
+# workflow_dispatch 是官方白名單例外;跑在同一 head sha,PR 的 checks 照樣顯示。
+# merge 不在此自動化範圍:PR 開好後等 owner 授權。
+on:
+  workflow_call: {}
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CORE_REPO: pei760730/collector-core
+      DEP_NAME: "@pei760730/collector-core"
+    steps:
+      # cron 事件永遠跑在消費 repo 的 default branch;workflow_dispatch 選其他 ref = 測試路徑
+      # (bump branch 會從該 ref 切出,PR base 仍是 main)。
+      - uses: actions/checkout@v5
+
+      - name: 偵測目前版 vs core 最新 tag
+        id: detect
+        run: |
+          set -euo pipefail
+          CUR=$(node -p '(((require("./package.json").dependencies||{})[process.env.DEP_NAME]||"").match(/#v(.+)$/)||[])[1]||""')
+          if [ -z "$CUR" ]; then echo "非 git-tag dep,跳過"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          git ls-remote "https://github.com/$CORE_REPO.git" 'refs/tags/v*' > /tmp/tags.txt
+          # annotated tag 要取 peeled(^{})的 commit sha,lightweight 直接用 ref 的 sha。
+          # 用 index/substr 不用 regex 比對 ^{}:mawk(ubuntu 預設)對 \{ 跳脫行為與 gawk 不一致。
+          LINE=$(awk '{sha=$1; ref=substr($2,11); if (index(ref,"^{}")>0) {p[substr(ref,1,length(ref)-3)]=sha} else {t[ref]=sha}} END {for (r in t) print (r in p ? p[r] : t[r]), r}' /tmp/tags.txt | sort -k2,2 -V | tail -1)
+          SHA=$(echo "$LINE" | cut -d' ' -f1)
+          LATEST=$(echo "$LINE" | cut -d' ' -f2 | sed 's/^v//')
+          echo "目前 v$CUR,最新 v$LATEST(commit $SHA)"
+          if [ "$LATEST" = "$CUR" ]; then echo "已是最新,no-op"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          HI=$(printf '%s\n%s\n' "$CUR" "$LATEST" | sort -V | tail -1)
+          if [ "$HI" != "$LATEST" ]; then echo "::warning::目前 v$CUR 比最新 tag v$LATEST 新,異常,跳過"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          if [ -n "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "bump-core-v$LATEST" --state open --json number --jq '.[].number')" ]; then
+            echo "bump PR 已存在,跳過"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          { echo "skip=false"; echo "cur=$CUR"; echo "latest=$LATEST"; echo "sha=$SHA"; } >> "$GITHUB_OUTPUT"
+
+      - name: surgical 編輯 package.json + lock(spec/resolved/version 三處,照 core README 發版節)
+        if: steps.detect.outputs.skip == 'false'
+        env:
+          NEW_V: ${{ steps.detect.outputs.latest }}
+          NEW_SHA: ${{ steps.detect.outputs.sha }}
+        run: |
+          node -e '
+          const fs=require("fs");
+          const dep=process.env.DEP_NAME, v=process.env.NEW_V, sha=process.env.NEW_SHA;
+          const spec=`github:${process.env.CORE_REPO}#v${v}`;
+          const rw=(f,fn)=>{const o=JSON.parse(fs.readFileSync(f,"utf8"));fn(o);fs.writeFileSync(f,JSON.stringify(o,null,2)+"\n");};
+          rw("package.json",o=>{o.dependencies[dep]=spec;});
+          rw("package-lock.json",o=>{
+            o.packages[""].dependencies[dep]=spec;
+            const e=o.packages["node_modules/"+dep];
+            e.version=v;
+            e.resolved=e.resolved.replace(/#[0-9a-f]+$/,"#"+sha);
+          });'
+          git diff --stat
+
+      - uses: actions/setup-node@v5
+        if: steps.detect.outputs.skip == 'false'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: npm ci + 宣稱==實裝反向驗證(裝到的必須是新版)
+        if: steps.detect.outputs.skip == 'false'
+        env:
+          NEW_V: ${{ steps.detect.outputs.latest }}
+        run: |
+          npm ci
+          node -e '
+          const inst=require("./node_modules/"+process.env.DEP_NAME+"/package.json").version;
+          if(inst!==process.env.NEW_V){console.error("installed "+inst+" !== expected "+process.env.NEW_V);process.exit(1);}
+          console.log("collector-core ok: "+inst);'
+
+      - name: push branch + 開 PR + dispatch CI
+        if: steps.detect.outputs.skip == 'false'
+        id: pr
+        env:
+          CUR: ${{ steps.detect.outputs.cur }}
+          NEW_V: ${{ steps.detect.outputs.latest }}
+          NEW_SHA: ${{ steps.detect.outputs.sha }}
+        run: |
+          set -euo pipefail
+          BR="bump-core-v$NEW_V"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BR"
+          git add package.json package-lock.json
+          git commit -m "chore: bump collector-core v$CUR→v$NEW_V(cron 自動開單)"
+          git push -f origin "$BR"
+          # PR body 逐行 echo 進檔(YAML block scalar 裡放頂格多行字串會炸縮排,別改回 heredoc/多行變數)
+          {
+            echo "自動 bump(core-bump cron 開單,merge 等 owner 授權)。"
+            echo ""
+            echo "- collector-core \`v$CUR\` → \`v$NEW_V\`"
+            echo "- lock resolved sha = \`$NEW_SHA\`(= tag v$NEW_V 的 commit;workflow 內已 npm ci 反向驗證宣稱==實裝)"
+            echo "- 變更內容:https://github.com/$CORE_REPO/compare/v$CUR...v$NEW_V"
+            echo "- CI 由 bump workflow dispatch 補跑(GITHUB_TOKEN 開的 PR 不自動觸發 pull_request)"
+          } > /tmp/pr-body.md
+          URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BR" \
+            --title "chore: bump collector-core v$CUR→v$NEW_V" --body-file /tmp/pr-body.md)
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BR"
+
+      - name: kai-notify 開單通知
+        if: steps.detect.outputs.skip == 'false'
+        uses: pei760730/kai-notify@main
+        env:
+          KAI_NOTIFY_BOT_TOKEN: ${{ secrets.KAI_NOTIFY_BOT_TOKEN }}
+          KAI_NOTIFY_CHAT_ID: ${{ secrets.KAI_NOTIFY_CHAT_ID }}
+        with:
+          text: "📦 ${{ github.repository }}:collector-core v${{ steps.detect.outputs.latest }} bump PR 已開(CI 已觸發),等授權 merge → ${{ steps.pr.outputs.url }}"
+
+      - name: kai-notify 失敗告警
+        if: failure()
+        uses: pei760730/kai-notify@main
+        env:
+          KAI_NOTIFY_BOT_TOKEN: ${{ secrets.KAI_NOTIFY_BOT_TOKEN }}
+          KAI_NOTIFY_CHAT_ID: ${{ secrets.KAI_NOTIFY_CHAT_ID }}
+        with:
+          text: "🔴 ${{ github.repository }} core-bump 跑掛:https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
