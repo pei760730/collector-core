@@ -24,6 +24,12 @@ const TRACKING_PARAMS = new Set([
   // 小紅書(xiaohongshu)分享指紋 / 時效性 token
   "xsec_token",
   "xsec_source",
+  // 2026-07-06 對齊 feed(終審 #8 收斂雙向 drift):TikTok/X 分享後綴 + FB 分享/轉址追蹤碼。
+  // 不砍會讓同片不同分享碼清出不同 CLEAN_URL → feed 總表 gate 漏擋、重複回流(gate 命門)。
+  "tt_from",
+  "s",
+  "mibextid",
+  "rdid",
 ]);
 
 /** 行動版 → 桌面版 host 對照。 */

@@ -11,6 +11,21 @@ describe("cleanUrl", () => {
     expect(out).not.toContain("fbclid");
   });
 
+  it("2026-07-06 對齊 feed 補的四個分享追蹤碼(tt_from/s/mibextid/rdid)", () => {
+    // TikTok 分享後綴 + X ?s=20 + FB mibextid/rdid:不砍會讓同片不同分享碼
+    // 清出不同 CLEAN_URL → feed 總表 gate 漏擋(重複回流)。
+    const tiktok = cleanUrl("https://www.tiktok.com/@u/video/123?tt_from=copy&s=v2").cleanUrl;
+    expect(tiktok).not.toContain("tt_from");
+    expect(tiktok).not.toContain("s=");
+    const x = cleanUrl("https://x.com/a/status/99?s=20").cleanUrl;
+    expect(x).not.toContain("s=20");
+    const fb = cleanUrl("https://www.facebook.com/reel/42?mibextid=abc&rdid=def").cleanUrl;
+    expect(fb).not.toContain("mibextid");
+    expect(fb).not.toContain("rdid");
+    // 真參數不受波及(YouTube ?v= 白名單語意)
+    expect(cleanUrl("https://www.youtube.com/watch?v=abcdefghijk&s=x").cleanUrl).toContain("v=abcdefghijk");
+  });
+
   it("行動版轉桌面版", () => {
     expect(cleanUrl("https://m.tiktok.com/v/123").cleanUrl).toContain("www.tiktok.com");
     expect(cleanUrl("https://mobile.twitter.com/a/status/1").cleanUrl).toContain(
