@@ -146,6 +146,10 @@ export function cleanUrl(input: string): CleanedUrl {
     }
   }
 
+  // 去掉 fragment(#…):groupKey 會砍 #,但 CLEAN_URL 若殘留 #Echobox=/#xtor= 這類
+  // 追蹤片段,同片內容會清出不同 CLEAN_URL → feed 總表 gate 漏擋。
+  url.hash = "";
+
   let out = url.toString();
   out = stringCleanup(out);
   return { cleanUrl: out, isShortUrl };
@@ -157,6 +161,9 @@ export function cleanUrl(input: string): CleanedUrl {
  */
 function stringCleanup(s: string): string {
   let out = s;
+  // fragment 永遠在 query 之後、URL 最末段;砍第一個 # 到結尾即為完整 fragment,
+  // 不會誤傷前面合法的 ?v=(非法 URL 走這層 fallback 時也一致去 #frag)。
+  out = out.replace(/#.*$/, ""); // 去 fragment(#…)
   out = out.replace(/\?&/g, "?"); // ?& → ?
   out = out.replace(/&{2,}/g, "&"); // 多個 & 合併
   out = out.replace(/[?&]+$/g, ""); // 去尾端孤立的 ? 或 &

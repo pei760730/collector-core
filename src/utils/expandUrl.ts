@@ -20,7 +20,11 @@ async function follow(url: string, method: "HEAD" | "GET", timeoutMs: number): P
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const res = await fetch(url, { method, redirect: "follow", signal: controller.signal });
-    return res.url || url;
+    const finalUrl = res.url || url;
+    // GET fallback 會把整個目標頁下載進 body;不消費/取消就會佔著 socket 直到 GC。
+    // 讀完 res.url 就取消 body 串流。用 optional chaining:HEAD 無 body、測試 stub 亦無 body。
+    res.body?.cancel().catch(() => {});
+    return finalUrl;
   } finally {
     clearTimeout(timer);
   }

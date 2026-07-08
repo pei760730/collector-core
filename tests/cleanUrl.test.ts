@@ -89,6 +89,17 @@ describe("cleanUrl", () => {
     expect(out).toBe("https://www.xiaohongshu.com/explore/abc");
   });
 
+  it("去掉 fragment(#…)但保留合法 query", () => {
+    // #Echobox= 這類追蹤片段殘留會讓同片清出不同 CLEAN_URL → feed gate 漏擋。
+    expect(
+      cleanUrl("https://www.instagram.com/reel/ABC123?igsh=x#Echobox=99").cleanUrl,
+    ).toBe("https://www.instagram.com/reel/ABC123");
+    // ?v=X 是保留參數:去 #frag 但留 ?v=X。
+    expect(
+      cleanUrl("https://www.youtube.com/watch?v=abcdefghijk#frag").cleanUrl,
+    ).toBe("https://www.youtube.com/watch?v=abcdefghijk");
+  });
+
   describe("Facebook 轉址解開(l.facebook.com/l.php?u=…)", () => {
     it("還原內層 IG reel(外層 fbclid 也清掉)", () => {
       const inner = "https://www.instagram.com/reel/CxYz_-1";
