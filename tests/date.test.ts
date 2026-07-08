@@ -30,6 +30,17 @@ describe("date utils（台北牆鐘）", () => {
     expect(ageInDays("", now)).toBe(Infinity);
   });
 
+  it("溢位日期(dayjs 會靜默向前滾動)→ null,不接受滾動後結果", () => {
+    // dayjs 把 2026/2/30 滾成 2026-03-02 且 isValid()=true;回寫比對才擋得住。
+    expect(parseSheetDate("2026/2/30")).toBeNull();
+    expect(parseSheetDate("2026-02-30")).toBeNull();
+    expect(parseSheetDate("2026/13/45")).toBeNull();
+    // 溢位日期經 ageInDays → Infinity(視為超出任何窗格)。
+    const now = dayjs.tz("2026-07-08 09:00", TZ).valueOf();
+    expect(ageInDays("2026/2/30", now)).toBe(Infinity);
+    expect(ageInDays("2026-02-30", now)).toBe(Infinity);
+  });
+
   it("todayIsoTaipei：UTC 前一晚仍算台北當天", () => {
     // 2026-07-07T17:00Z = 2026-07-08 01:00 台北
     expect(todayIsoTaipei(Date.UTC(2026, 6, 7, 17, 0, 0))).toBe("2026-07-08");
