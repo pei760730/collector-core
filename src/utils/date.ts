@@ -28,8 +28,16 @@ export function parseSheetDate(s: string): dayjs.Dayjs | null {
     const [, y, mo, da] = m;
     return dayjs.tz(`${y}-${mo!.padStart(2, "0")}-${da!.padStart(2, "0")}`, TZ);
   }
-  const d = dayjs(s.trim());
-  return d.isValid() ? d.tz(TZ) : null;
+  // ISO(及其他 dayjs 可解析格式)同樣以台北牆鐘解析,與上面 YYYY/M/D 分支一致。
+  // 舊寫法 dayjs(s).tz(TZ) 先用 runner 本地時區解析再位移「瞬時」,在 UTC+9..+14 的
+  // runner 上 ISO 日期會倒退一天 → ageInDays off-by-one(CI 在 UTC 被遮蔽、cron 換時區才爆)。
+  // dayjs.tz 對無法解析的字串會 throw(不同於 dayjs() 回 invalid),故包 try。
+  try {
+    const d = dayjs.tz(s.trim(), TZ);
+    return d.isValid() ? d : null;
+  } catch {
+    return null;
+  }
 }
 
 /** 距今天數(台北);解析不出回 Infinity(視為超出任何窗格)。 */
