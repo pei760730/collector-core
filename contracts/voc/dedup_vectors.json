@@ -45,6 +45,23 @@
         "https://www.douyin.com/video/7234567890123456789",
         "https://www.douyin.com/video/7234567890123456789?recommend=1"
       ]
+    },
+    {
+      "name": "xhs-大寫hex-id-與小寫同群",
+      "why": "小紅書 id 是 24 碼 hex,大寫 hex 會被 lowercase 收斂進小寫 canonical key,故大小寫同群",
+      "urls": [
+        "https://www.xiaohongshu.com/explore/663ED2B2000000001E0102A3",
+        "https://www.xiaohongshu.com/explore/663ed2b2000000001e0102a3"
+      ]
+    },
+    {
+      "name": "facebook-fb.com短網域與facebook.com同群",
+      "why": "fb.com 短網域是 facebook.com 別名,同一 watch?v=<n> 形態經 host normalization 收斂同 key",
+      "urls": [
+        "https://fb.com/watch?v=5566778899",
+        "https://www.facebook.com/watch?v=5566778899",
+        "https://facebook.com/watch?v=5566778899"
+      ]
     }
   ],
   "distinct": [
