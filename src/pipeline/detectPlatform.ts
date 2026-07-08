@@ -6,31 +6,50 @@
  * 用 hostname 結尾比對,避免 `netflix.com` 命中 `x.com`、`tiktok.com.evil.com`
  * 被當成 tiktok 這種子字串誤判。
  */
-import type { Platform, PlatformInfo } from "../types.js";
+import { PLATFORM_CODE, type Platform, type PlatformInfo } from "../types.js";
 
 interface Rule {
   platform: Platform;
-  icon: string;
   /** 命中其一即判定(比對 hostname 是否等於或結尾為此網域)。 */
   domains: string[];
 }
 
 /** 順序即優先序,先命中先贏。 */
 const RULES: Rule[] = [
-  { platform: "TikTok", icon: "🎵", domains: ["tiktok.com"] },
-  { platform: "YouTube", icon: "📺", domains: ["youtube.com", "youtu.be"] },
-  { platform: "Facebook", icon: "📘", domains: ["facebook.com", "fb.com", "fb.watch", "fb.me"] },
-  { platform: "Instagram", icon: "📸", domains: ["instagram.com"] },
-  { platform: "Threads", icon: "🧵", domains: ["threads.net", "threads.com"] },
-  { platform: "X", icon: "🐦", domains: ["x.com", "twitter.com"] },
-  { platform: "抖音", icon: "🎶", domains: ["douyin.com"] },
-  { platform: "小紅書", icon: "📕", domains: ["xhslink.com", "xiaohongshu.com"] },
+  { platform: "TikTok", domains: ["tiktok.com"] },
+  { platform: "YouTube", domains: ["youtube.com", "youtu.be"] },
+  { platform: "Facebook", domains: ["facebook.com", "fb.com", "fb.watch", "fb.me"] },
+  { platform: "Instagram", domains: ["instagram.com"] },
+  { platform: "Threads", domains: ["threads.net", "threads.com"] },
+  { platform: "X", domains: ["x.com", "twitter.com"] },
+  { platform: "抖音", domains: ["douyin.com"] },
+  { platform: "小紅書", domains: ["xhslink.com", "xiaohongshu.com"] },
 ];
 
-export const PLATFORM_ICON: Record<Platform, string> = {
-  ...Object.fromEntries(RULES.map((r) => [r.platform, r.icon])),
+/**
+ * 平台顯示名 → 圖示。改用顯式字面 + `satisfies`(不再 `as` cast):往 Platform union 加
+ * 平台卻忘了在此補一列,TS 會編譯期報錯,不會像舊 cast 那樣執行期吐 undefined 傳染三個 bot。
+ */
+export const PLATFORM_ICON = {
+  TikTok: "🎵",
+  YouTube: "📺",
+  Facebook: "📘",
+  Instagram: "📸",
+  Threads: "🧵",
+  X: "🐦",
+  抖音: "🎶",
+  小紅書: "📕",
   Unknown: "❓",
-} as Record<Platform, string>;
+} satisfies Record<Platform, string>;
+
+/**
+ * 下游統一小寫碼 → 圖示(SSoT 派生自 PLATFORM_CODE × PLATFORM_ICON)。
+ * 三個 bot 原本各自用 PLATFORM_CODE+PLATFORM_ICON 手組同一份 code→icon 反查表、會漂移;
+ * 由 core 匯出單一份,消費端改 import 即可(新平台只需在此二表補一次)。
+ */
+export const ICON_BY_CODE: Record<string, string> = Object.fromEntries(
+  (Object.keys(PLATFORM_CODE) as Platform[]).map((p) => [PLATFORM_CODE[p], PLATFORM_ICON[p]]),
+);
 
 /** hostname 是否等於或為某網域的子網域(`www.youtube.com` ⊂ `youtube.com`)。 */
 function hostMatches(hostname: string, domain: string): boolean {
