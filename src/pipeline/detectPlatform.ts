@@ -51,6 +51,11 @@ export const ICON_BY_CODE: Record<string, string> = Object.fromEntries(
   (Object.keys(PLATFORM_CODE) as Platform[]).map((p) => [PLATFORM_CODE[p], PLATFORM_ICON[p]]),
 );
 
+/** 小寫平台碼 → emoji;認不得的碼回退預設點(`•`)。三個 bot 原本各自持一份逐字副本。 */
+export function iconFor(code: string): string {
+  return ICON_BY_CODE[code] ?? "•";
+}
+
 /** hostname 是否等於或為某網域的子網域(`www.youtube.com` ⊂ `youtube.com`)。 */
 function hostMatches(hostname: string, domain: string): boolean {
   return hostname === domain || hostname.endsWith(`.${domain}`);
