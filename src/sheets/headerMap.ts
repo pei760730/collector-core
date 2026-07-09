@@ -37,15 +37,31 @@ export function resolveHeaderIndexes(
   const cells = header.map((h) => String(h ?? "").trim());
   const indexOf: Record<string, number> = {};
   const missing: string[] = [];
+  const duplicated: string[] = [];
   for (const col of required) {
     const idx = cells.indexOf(col);
-    if (idx < 0) missing.push(col);
-    else indexOf[col] = idx;
+    if (idx < 0) {
+      missing.push(col);
+      continue;
+    }
+    // 同名必要欄出現多於一次:indexOf 只會靜默綁第一個,寫讀可能各對到不同實體欄
+    // (人工複製欄位常見)→ 與缺欄同級 fail-fast,寧可停下等人對齊,不默默錯欄。
+    if (cells.indexOf(col, idx + 1) >= 0) {
+      duplicated.push(col);
+      continue;
+    }
+    indexOf[col] = idx;
   }
   if (missing.length > 0) {
     throw new Error(
       `${label}表頭缺少必要欄 [${missing.join(",")}],拒絕寫入(避免錯欄毀資料)。` +
         `現有=[${cells.join(",")}] 需要=[${required.join(",")}]。請對齊表頭 schema。`,
+    );
+  }
+  if (duplicated.length > 0) {
+    throw new Error(
+      `${label}表頭有重複的必要欄 [${duplicated.join(",")}],拒絕寫入(無法判定該綁哪一欄,避免錯欄毀資料)。` +
+        `現有=[${cells.join(",")}]。請刪除重複欄後重試。`,
     );
   }
   return { indexOf, width: Math.max(cells.length, required.length) };

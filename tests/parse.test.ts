@@ -67,6 +67,16 @@ describe("parseMessage", () => {
     expect(() => parseMessage({ text: "https://[" })).toThrow(NoUrlError);
   });
 
+  it("首 URL 畸形 + 次 URL 合法 → 收錄次 URL(不整則誤判 NoUrlError)", () => {
+    const r = parseMessage({ text: "https://[ https://youtu.be/dQw4w9WgXcQ 好片" });
+    expect(r.rawUrl).toBe("https://youtu.be/dQw4w9WgXcQ");
+    expect(r.note).toContain("好片");
+  });
+
+  it("所有候選 URL 都畸形 → 仍 NoUrlError", () => {
+    expect(() => parseMessage({ text: "https://[ 然後 https://。。。" })).toThrow(NoUrlError);
+  });
+
   it("正常訊息 truncated=false", () => {
     const r = parseMessage({ text: "https://youtu.be/abc 好片" });
     expect(r.truncated).toBe(false);
@@ -82,6 +92,24 @@ describe("parseMessage", () => {
   it("超長備註 → 截斷並標記 truncated", () => {
     const r = parseMessage({ text: `https://youtu.be/abc ${"哈".repeat(3000)}` });
     expect(r.note.length).toBeLessThanOrEqual(2000);
+    expect(r.truncated).toBe(true);
+  });
+
+  it("備註截斷點正好劈開 emoji surrogate pair → 回退一位,不留 lone surrogate", () => {
+    // 備註 = "a" + 1200 個 😀(每個佔 2 code unit)→ 長度 2401;
+    // slice(0, 2000) 會正好切在第 1000 個 😀 的 pair 中間,尾端留 lone high surrogate。
+    const r = parseMessage({ text: `https://youtu.be/abc a${"😀".repeat(1200)}` });
+    expect(r.truncated).toBe(true);
+    expect(r.note.length).toBe(1999); // 2000 劈在 pair 中間 → 回退一位
+    const last = r.note.charCodeAt(r.note.length - 1);
+    const isLoneHighSurrogate = last >= 0xd800 && last <= 0xdbff;
+    expect(isLoneHighSurrogate).toBe(false);
+    expect(r.note.endsWith("😀")).toBe(true); // 尾端是完整 emoji
+  });
+
+  it("備註截斷點沒劈開 pair → 照常截在 2000", () => {
+    const r = parseMessage({ text: `https://youtu.be/abc ${"哈".repeat(2500)}` });
+    expect(r.note.length).toBe(2000);
     expect(r.truncated).toBe(true);
   });
 });

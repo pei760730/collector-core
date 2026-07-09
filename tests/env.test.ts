@@ -3,13 +3,14 @@
  * 打錯一項就該紅燈,不能靠 Number() 把 "1e5"/"0x10"/"12.0" 默默吞成錯 id)。
  * 由三個 collector 的 config.ts 逐字副本抽進 core,行為需一致。
  */
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import {
   required,
   optional,
   boolEnv,
   enumEnv,
   chatIdsEnv,
+  loadGoogleCredentials,
 } from "../src/config/env.js";
 
 const KEY = "TEST_ENV_HELPER_KEY";
@@ -114,5 +115,98 @@ describe("enumEnv", () => {
   it("不在白名單 → 丟錯", () => {
     set("nope");
     expect(() => enumEnv(KEY, allowed, "sheets")).toThrow(/只能是/);
+  });
+});
+
+describe("loadGoogleCredentials:三來源優先序 + 驗證(純環境變數,不碰真檔案憑證)", () => {
+  const VARS = [
+    "GOOGLE_SERVICE_ACCOUNT_JSON",
+    "GOOGLE_SERVICE_ACCOUNT_JSON_BASE64",
+    "GOOGLE_SERVICE_ACCOUNT_FILE",
+  ] as const;
+  const saved: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    for (const v of VARS) {
+      saved[v] = process.env[v];
+      delete process.env[v];
+    }
+  });
+  afterEach(() => {
+    for (const v of VARS) {
+      if (saved[v] === undefined) delete process.env[v];
+      else process.env[v] = saved[v];
+    }
+  });
+
+  const creds = (email: string): string =>
+    JSON.stringify({ client_email: email, private_key: "-----KEY-----" });
+  const b64 = (s: string): string => Buffer.from(s, "utf-8").toString("base64");
+
+  it("JSON 字串來源:解析並回傳 client_email/private_key", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = creds("json@sa.test");
+    expect(loadGoogleCredentials()).toEqual({
+      client_email: "json@sa.test",
+      private_key: "-----KEY-----",
+    });
+  });
+
+  it("base64 來源:decode 後解析", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 = b64(creds("b64@sa.test"));
+    expect(loadGoogleCredentials().client_email).toBe("b64@sa.test");
+  });
+
+  it("優先序 JSON > base64:兩者都設時用 JSON(base64 即使是壞值也不會被碰)", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = creds("json@sa.test");
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 = "!!!not-base64!!!";
+    expect(loadGoogleCredentials().client_email).toBe("json@sa.test");
+  });
+
+  it("優先序 base64 > file:兩者都設時用 base64(file 指向不存在路徑也不會被讀)", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 = b64(creds("b64@sa.test"));
+    process.env.GOOGLE_SERVICE_ACCOUNT_FILE = "/definitely/not/a/real/file.json";
+    expect(loadGoogleCredentials().client_email).toBe("b64@sa.test");
+  });
+
+  it("只設 file 且路徑不存在 → readFileSync 丟錯(file 分支有被走到)", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_FILE = "/definitely/not/a/real/file.json";
+    expect(() => loadGoogleCredentials()).toThrow();
+  });
+
+  it("private_key 內字面 \\n 還原成真正換行(.env 單行貼法)", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
+      client_email: "nl@sa.test",
+      private_key: "-----BEGIN-----\\nAAA\\nBBB\\n-----END-----",
+    });
+    expect(loadGoogleCredentials().private_key).toBe(
+      "-----BEGIN-----\nAAA\nBBB\n-----END-----",
+    );
+  });
+
+  it("三來源皆無 → 丟錯(fail-fast)", () => {
+    expect(() => loadGoogleCredentials()).toThrow(/缺少 Google 憑證/);
+  });
+
+  it("空白字串視同未設(trim 後為空 → 落到下一來源/丟錯)", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = "   ";
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 = b64(creds("b64@sa.test"));
+    expect(loadGoogleCredentials().client_email).toBe("b64@sa.test");
+  });
+
+  it("壞 JSON → 丟解析錯誤(不默默吞)", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = "{not json";
+    expect(() => loadGoogleCredentials()).toThrow(/JSON 解析失敗/);
+  });
+
+  it("base64 decode 出來不是合法 JSON → 同樣丟解析錯誤", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 = b64("{not json");
+    expect(() => loadGoogleCredentials()).toThrow(/JSON 解析失敗/);
+  });
+
+  it("缺 client_email 或 private_key → 丟錯", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: "x@sa.test" });
+    expect(() => loadGoogleCredentials()).toThrow(/缺 client_email \/ private_key/);
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ private_key: "k" });
+    expect(() => loadGoogleCredentials()).toThrow(/缺 client_email \/ private_key/);
   });
 });

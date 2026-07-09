@@ -167,7 +167,13 @@ function stringCleanup(s: string): string {
   out = out.replace(/\?&/g, "?"); // ?& → ?
   out = out.replace(/&{2,}/g, "&"); // 多個 & 合併
   out = out.replace(/[?&]+$/g, ""); // 去尾端孤立的 ? 或 &
-  out = out.replace(/\/(\?)/g, "$1"); // path 與 query 間多餘斜線 /? → ?
+  // path 與 query 間多餘斜線 /? → ?:**只**處理真正的 query 邊界(字串中第一個 `?`,
+  // fragment 已去掉所以它必是分隔符)。之前的 /\/(\?)/g global 會連 query 值內的
+  // 字面 `/?` 一起改寫(如 `?next=/a/?b` 被變造成 `?next=/a?b`),污染參數值。
+  const qIdx = out.indexOf("?");
+  if (qIdx > 0 && out[qIdx - 1] === "/") {
+    out = out.slice(0, qIdx - 1) + out.slice(qIdx);
+  }
   // 去尾斜線(不動協定後的 //;真實情況不會只剩 https://)
   out = out.replace(/\/+$/, "");
   return out;

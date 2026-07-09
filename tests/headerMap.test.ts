@@ -47,6 +47,21 @@ describe("resolveHeaderIndexes:依名解析", () => {
   it("必要欄整個缺席 → fail-fast(避免錯欄毀資料)", () => {
     expect(() => resolveHeaderIndexes(["平台", "連結", "挑"], COLUMNS, "參考池")).toThrow(/加入日期/);
   });
+
+  it("必要欄重複出現 → fail-fast(indexOf 靜默綁第一個會寫讀對到不同實體欄)", () => {
+    expect(() =>
+      resolveHeaderIndexes(["平台", "連結", "連結", "挑", "加入日期"], COLUMNS, "參考池"),
+    ).toThrow(/重複的必要欄 \[連結\]/);
+  });
+
+  it("重複的是非必要欄 → 容忍(不干涉 bot 外的欄)", () => {
+    const layout = resolveHeaderIndexes(
+      ["備用", "平台", "連結", "挑", "加入日期", "備用"],
+      COLUMNS,
+      "參考池",
+    );
+    expect(layout.indexOf).toEqual({ 平台: 1, 連結: 2, 挑: 3, 加入日期: 4 });
+  });
 });
 
 describe("placeRow / readNamedRow:飄移列來回對得上", () => {
