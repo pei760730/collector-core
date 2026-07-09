@@ -72,6 +72,21 @@ describe("cleanUrl", () => {
     expect(out).toBe("https://x.com/a");
   });
 
+  it("path→query 邊界的 /? 收斂,但 query 值內的字面 /? 不被變造", () => {
+    // 之前 /\/(\?)/g global 會把 ?next=/a/?b 變造成 ?next=/a?b(污染參數值)。
+    expect(cleanUrl("https://x.com/login/?next=/a/?b").cleanUrl).toBe(
+      "https://x.com/login?next=/a/?b",
+    );
+    // query 值內含 /? 但邊界本來就乾淨 → 完全不動。
+    expect(cleanUrl("https://x.com/login?next=/a/?b").cleanUrl).toBe(
+      "https://x.com/login?next=/a/?b",
+    );
+    // 一般 path→query 邊界照舊收斂(與既有行為一致)。
+    expect(cleanUrl("https://x.com/a/?v=1").cleanUrl).toBe("https://x.com/a?v=1");
+    // 非法 URL(host 解析失敗)走 fallback 字串清理,也只收斂第一個邊界、不動 query 值。
+    expect(cleanUrl("https://%/a/?next=/x/?y").cleanUrl).toBe("https://%/a?next=/x/?y");
+  });
+
   it("清掉 Meta/Threads 分享追蹤碼(xmt/slof/igsh)", () => {
     const out = cleanUrl(
       "https://www.threads.com/@u/post/DZwtc9Jk7Yf?xmt=AQG0abc&slof=1",

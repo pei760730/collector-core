@@ -4,8 +4,8 @@
  */
 import type { ParsedMessage } from "../types.js";
 
-/** 抓訊息中第一個 http(s) 網址。 */
-const URL_RE = /https?:\/\/\S+/;
+/** 抓訊息中所有 http(s) 網址候選(取第一個通過嚴格驗證者)。 */
+const URL_RE = /https?:\/\/\S+/g;
 
 // 1) 截斷在第一個「非 URL 合法字元」—— CJK 等必須 %-encode 的字不會出現在裸 URL,
 //    所以遇到就代表後面是備註。把 `…/abc。很好笑` 切回 `…/abc`。
@@ -59,6 +59,19 @@ export function cleanNote(s: string): string {
     .trim();
 }
 
+/**
+ * surrogate-safe 截斷:`slice` 以 UTF-16 code unit 計,截斷點若正好劈開 emoji
+ * (astral char 的 surrogate pair),尾端會留 lone high surrogate —— 下游 JSON 序列化 /
+ * Sheets API 遇到 ill-formed 字串行為未定義。截完檢查尾字元,是 lone surrogate 就回退一位。
+ */
+function truncateWellFormed(s: string, max: number): string {
+  const out = s.slice(0, max);
+  const last = out.charCodeAt(out.length - 1);
+  // 0xD800–0xDBFF = high surrogate:pair 的前半被留下、後半被切掉 → 回退一位。
+  if (last >= 0xd800 && last <= 0xdbff) return out.slice(0, -1);
+  return out;
+}
+
 export class NoUrlError extends Error {
   constructor() {
     super("訊息中找不到網址");
@@ -75,33 +88,35 @@ export interface ParseInput {
  */
 export function parseMessage(input: ParseInput): ParsedMessage {
   const text = (input.text ?? "").trim();
-  const match = text.match(URL_RE);
-  if (!match) {
-    throw new NoUrlError();
+  // 迭代所有 URL_RE 命中、取第一個通過嚴格驗證的候選 —— 只看第一個命中的話,
+  // 首 token 畸形(如 `https://[`)會把整則訊息誤判成 NoUrlError,合法的次 URL 被丟掉。
+  for (const match of text.matchAll(URL_RE)) {
+    const token = match[0];
+    const tidied = tidyUrl(token);
+    let truncated = false;
+    // 先界定長度(fanout-safety),再嚴格驗證:超長 URL 截斷後多半 parse 失敗被擋。
+    let rawUrl = tidied;
+    if (rawUrl.length > MAX_URL_LEN) {
+      rawUrl = rawUrl.slice(0, MAX_URL_LEN);
+      truncated = true;
+    }
+    if (!isValidHttpUrl(rawUrl)) {
+      // 這個候選被剝光(`https://` 後全是標點)或非 http(s)/畸形 → 試下一個命中
+      continue;
+    }
+    // 備註 = 用「位置」切掉被匹配的整個 token,再把 tidyUrl 從 token 尾端截掉的備註正文補回。
+    // 不用 text.replace(rawUrl):replace 只換首個出現、且會誤切備註裡與 URL 相同的片段。
+    // urlTail 用「未截斷」的 tidied 長度算,避免把超長 URL 的截斷尾段灌進備註。
+    const before = text.slice(0, match.index ?? 0);
+    const after = text.slice((match.index ?? 0) + token.length);
+    const urlTail = token.slice(tidied.length); // tidyUrl 砍掉的尾段(備註開頭 / 包裹標點)
+    let note = cleanNote(`${before}${urlTail}${after}`);
+    if (note.length > MAX_NOTE_LEN) {
+      note = truncateWellFormed(note, MAX_NOTE_LEN);
+      truncated = true;
+    }
+    return { rawUrl, note, truncated };
   }
-  const token = match[0];
-  const tidied = tidyUrl(token);
-  let truncated = false;
-  // 先界定長度(fanout-safety),再嚴格驗證:超長 URL 截斷後多半 parse 失敗被擋。
-  let rawUrl = tidied;
-  if (rawUrl.length > MAX_URL_LEN) {
-    rawUrl = rawUrl.slice(0, MAX_URL_LEN);
-    truncated = true;
-  }
-  if (!isValidHttpUrl(rawUrl)) {
-    // 整段被剝光(`https://` 後全是標點)或非 http(s)/畸形 URL → 視為沒有有效網址
-    throw new NoUrlError();
-  }
-  // 備註 = 用「位置」切掉被匹配的整個 token,再把 tidyUrl 從 token 尾端截掉的備註正文補回。
-  // 不用 text.replace(rawUrl):replace 只換首個出現、且會誤切備註裡與 URL 相同的片段。
-  // urlTail 用「未截斷」的 tidied 長度算,避免把超長 URL 的截斷尾段灌進備註。
-  const before = text.slice(0, match.index ?? 0);
-  const after = text.slice((match.index ?? 0) + token.length);
-  const urlTail = token.slice(tidied.length); // tidyUrl 砍掉的尾段(備註開頭 / 包裹標點)
-  let note = cleanNote(`${before}${urlTail}${after}`);
-  if (note.length > MAX_NOTE_LEN) {
-    note = note.slice(0, MAX_NOTE_LEN);
-    truncated = true;
-  }
-  return { rawUrl, note, truncated };
+  // 完全沒命中,或所有候選都驗不過 → 視為沒有有效網址
+  throw new NoUrlError();
 }

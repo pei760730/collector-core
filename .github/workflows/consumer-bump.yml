@@ -108,6 +108,19 @@ jobs:
           URL=$(gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$BR" \
             --title "chore: bump collector-core v$CUR→v$NEW_V" --body-file /tmp/pr-body.md)
           echo "url=$URL" >> "$GITHUB_OUTPUT"
+          # 關掉「舊版號」的殘留 bump PR(head 以 bump-core-v 開頭、版號 ≠ 本次):
+          # 上一輪 bump PR 沒 merge 又出新 tag 時會殘留,擱著會被誤 merge 成過期 pin。
+          # 放在新 PR 開好之後才關 → comment 能指向新 PR。關失敗只警告不炸 step(新 PR 已是事實)。
+          STALE=$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+            --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("bump-core-v")) | select(.headRefName != "bump-core-v'"$NEW_V"'") | .number' \
+            || echo "")
+          for n in $STALE; do
+            echo "關閉過期 bump PR #$n(被 v$NEW_V 取代)"
+            gh pr close "$n" --repo "$GITHUB_REPOSITORY" \
+              --comment "已被新版 bump PR 取代(collector-core v$NEW_V):$URL —— 此 PR 的 pin 已過期,merge 會裝到舊版,故自動關閉。" \
+              || echo "::warning::關閉過期 bump PR #$n 失敗,請手動處理"
+          done
           gh workflow run ci.yml --repo "$GITHUB_REPOSITORY" --ref "$BR"
 
       - name: kai-notify 開單通知
