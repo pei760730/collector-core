@@ -61,4 +61,27 @@ describe("parseMessage", () => {
     expect(r.rawUrl).toBe("https://x.com/a");
     expect(r.note).toBe("看 這個 x.com 帳號");
   });
+
+  it("畸形 URL(new URL 解不了)→ NoUrlError,不放行髒值給下游", () => {
+    // regex `^https?://\S` 會誤放行,嚴格 `new URL()` 驗證擋掉。
+    expect(() => parseMessage({ text: "https://[" })).toThrow(NoUrlError);
+  });
+
+  it("正常訊息 truncated=false", () => {
+    const r = parseMessage({ text: "https://youtu.be/abc 好片" });
+    expect(r.truncated).toBe(false);
+  });
+
+  it("超長 URL → 截斷並標記 truncated(fanout-safety)", () => {
+    const longUrl = `https://x.com/a?q=${"a".repeat(5000)}`;
+    const r = parseMessage({ text: longUrl });
+    expect(r.rawUrl.length).toBeLessThanOrEqual(2048);
+    expect(r.truncated).toBe(true);
+  });
+
+  it("超長備註 → 截斷並標記 truncated", () => {
+    const r = parseMessage({ text: `https://youtu.be/abc ${"哈".repeat(3000)}` });
+    expect(r.note.length).toBeLessThanOrEqual(2000);
+    expect(r.truncated).toBe(true);
+  });
 });

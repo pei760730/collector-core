@@ -44,6 +44,11 @@ export interface ParsedMessage {
   rawUrl: string;
   /** 訊息文字移除網址後的備註(display-only;是否寫入由 adapter 決定)。 */
   note: string;
+  /**
+   * 外部字串(rawUrl / note)超出 core 上限、已被截斷。fanout-safety:超大 / 注入
+   * payload 不會無界散給三個下游;adapter 可據此標記或降級處理。未超限為 false。
+   */
+  truncated: boolean;
 }
 
 /** Clean URL 階段輸出。 */
