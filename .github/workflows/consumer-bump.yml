@@ -1,18 +1,39 @@
 name: consumer-bump (reusable)
 
 # 消費端(sv-bot / clip / feed)的 collector-core 自動 bump——單一實作放 core(SSOT,避免三份殼各自漂移)。
-# 呼叫方式:各消費 repo 的 .github/workflows/core-bump.yml 每日 cron `uses` 本 workflow(secrets: inherit)。
+# 呼叫方式:各消費 repo 的 .github/workflows/core-bump.yml 每日 cron `uses` 本 workflow(secrets: inherit,
+# 本檔 workflow_call.secrets 顯式宣告用到哪些;job 自帶最小 permissions + 自保 concurrency,見 jobs.bump)。
 # 行為:偵測 core 最新 tag → 照 README 發版節 surgical 編輯 lock(spec / resolved / version 三處,不重生 lock)
 #      → npm ci 反向驗證宣稱==實裝 → 開 bump PR(body 附 resolved sha)→ dispatch 消費端 ci.yml → kai-notify。
 # 為什麼要自己 dispatch CI:GITHUB_TOKEN 開的 PR 不會觸發 pull_request workflow(GitHub 防遞迴),
 # workflow_dispatch 是官方白名單例外;跑在同一 head sha,PR 的 checks 照樣顯示。
 # merge 不在此自動化範圍:PR 開好後等 owner 授權。
 on:
-  workflow_call: {}
+  workflow_call:
+    # 顯式宣告本 workflow 用得到的 secrets(caller 仍可 secrets: inherit,同名自動綁定)。
+    # 目的:secrets 面收斂 —— 看這裡就知道本 workflow 碰得到哪些 secret,不是「caller 有什麼都拿得到」的黑箱。
+    secrets:
+      KAI_NOTIFY_BOT_TOKEN:
+        description: "kai-notify bot token(開單/失敗通知)"
+        required: true
+      KAI_NOTIFY_CHAT_ID:
+        description: "kai-notify 目標 chat id"
+        required: true
 
 jobs:
   bump:
     runs-on: ubuntu-latest
+    # 自帶最小權限(called workflow 只能降不能升):caller 若日後誤給過寬(如 write-all),
+    # 本 job 實際拿到的仍只有這三項 —— 與三個 caller 現行宣告一致。
+    permissions:
+      contents: write # push bump branch
+      pull-requests: write # 開 bump PR
+      actions: write # dispatch ci.yml(GITHUB_TOKEN 開的 PR 不自動觸發 pull_request)
+    # job 層自保 concurrency:三 caller 現都有 workflow 層 group=core-bump,此處防未來新 caller 忘記宣告。
+    # group 名刻意不同於 caller 的 core-bump —— workflow 層與 job 層搶同一個 group 會互等死鎖。
+    concurrency:
+      group: core-bump-job
+      cancel-in-progress: false # 會推 branch/開 PR,取消到一半留半套,寧可排隊
     env:
       GH_TOKEN: ${{ github.token }}
       CORE_REPO: pei760730/collector-core
