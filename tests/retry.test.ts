@@ -119,4 +119,49 @@ describe("withRetry 退避重試", () => {
     expect(fn).toHaveBeenCalledTimes(2);
     expect(alreadyDone).toHaveBeenCalledTimes(1);
   });
+
+  it("429 quota:退避基準為秒級(遠大於一般 500ms 起跳,才等得到每分鐘配額窗滾動)", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const fn = vi.fn(async () => {
+      throw { code: 429 };
+    });
+    const p = withRetry("append", fn, { tries: 2 });
+    const assertion = expect(p).rejects.toMatchObject({ code: 429 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    // 首次退避應 >= 5000ms(秒級起跳),證明不再用舊的 500ms·2^n(0.5s)硬窗打 429。
+    const delays = setTimeoutSpy.mock.calls.map((c) => c[1]);
+    expect(delays.some((d) => typeof d === "number" && d >= 5000)).toBe(true);
+  });
+
+  it("429 帶 Retry-After 時聽 Google 給的秒數(不過早重打、逐字尊重配額窗)", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const fn = vi.fn(async () => {
+      throw { code: 429, response: { headers: { "retry-after": "30" } } };
+    });
+    const p = withRetry("append", fn, { tries: 2 });
+    const assertion = expect(p).rejects.toMatchObject({ code: 429 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    // Retry-After: 30(秒)→ 精確等 30000ms,不加 jitter、不用退避預設。
+    const delays = setTimeoutSpy.mock.calls.map((c) => c[1]);
+    expect(delays).toContain(30000);
+  });
+
+  it("一般 5xx 暫態仍走 500ms 起跳的短退避(429 的秒級基準不外溢到非配額錯誤)", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const fn = vi.fn(async () => {
+      throw { code: 503 };
+    });
+    const p = withRetry("read", fn, { tries: 2 });
+    const assertion = expect(p).rejects.toMatchObject({ code: 503 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    // 退避 500..999ms(500 + full jitter),明顯 < 429 的 5000ms 秒級基準。
+    const nums = setTimeoutSpy.mock.calls
+      .map((c) => c[1])
+      .filter((d): d is number => typeof d === "number");
+    expect(nums.some((d) => d >= 500 && d < 5000)).toBe(true);
+    expect(nums.every((d) => d < 5000)).toBe(true);
+  });
 });
