@@ -27,6 +27,52 @@ export function isTransient(err: unknown): boolean {
   );
 }
 
+// 退避基準。一般暫態(5xx / 網路)用 500ms 起跳的指數退避即可;但 429 quota 不同 ——
+// Google Sheets 寫入配額是「每分鐘」制(60/min),舊的 500·2^n(0.5/1/2s,合計~3.5s)
+// 全燒在 3.5s 窗內,永遠等不到 60s 配額窗滾動,4 次注定失敗、還反過來拖慢配額復原。
+// 對 429:優先聽 Google 回的 Retry-After(它明說何時可再打),沒有才用「秒級」較長退避,
+// 才有機會跨過分鐘邊界真的復原。上限夾在 60s 避免無界等待。
+const BACKOFF_BASE_MS = 500; // 一般暫態(5xx / 網路)
+const BACKOFF_BASE_429_MS = 5_000; // 每分鐘配額 429:秒級起跳
+const BACKOFF_CAP_MS = 60_000; // Retry-After 與退避上限
+
+function httpStatus(err: unknown): number | undefined {
+  const e = err as { code?: number | string; response?: { status?: number } };
+  return typeof e?.code === "number" ? e.code : e?.response?.status;
+}
+
+/**
+ * 解析 Google/HTTP 在 429(或 403 quota)回的 Retry-After —— 支援秒數與 HTTP-date 兩種格式,
+ * 也吃 gaxios 風格的 `err.retryAfter`。解不出來回 undefined(交回退避預設)。夾上限 60s。
+ */
+function parseRetryAfterMs(err: unknown, now: number = Date.now()): number | undefined {
+  const e = err as {
+    retryAfter?: number | string;
+    response?: { headers?: Record<string, string | number | undefined> };
+  };
+  const headers = e?.response?.headers ?? {};
+  const raw = e?.retryAfter ?? headers["retry-after"] ?? headers["Retry-After"];
+  if (raw == null || raw === "") return undefined;
+  if (typeof raw === "number") {
+    return Number.isFinite(raw) && raw >= 0 ? Math.min(BACKOFF_CAP_MS, raw * 1000) : undefined;
+  }
+  const s = String(raw).trim();
+  if (/^\d+(\.\d+)?$/.test(s)) return Math.min(BACKOFF_CAP_MS, Number(s) * 1000);
+  const t = Date.parse(s); // HTTP-date
+  if (Number.isFinite(t)) return Math.min(BACKOFF_CAP_MS, Math.max(0, t - now));
+  return undefined;
+}
+
+/** 本次重試前該等多久:Retry-After 優先;否則 429 走秒級基準、其餘走 500ms 基準,均加 full jitter。 */
+function backoffMs(err: unknown, attempt: number): number {
+  const retryAfter = parseRetryAfterMs(err);
+  if (retryAfter !== undefined) return retryAfter;
+  const base = httpStatus(err) === 429 ? BACKOFF_BASE_429_MS : BACKOFF_BASE_MS;
+  const exp = Math.min(BACKOFF_CAP_MS, base * 2 ** (attempt - 1));
+  const jitter = Math.floor(Math.random() * base); // full jitter,打散同時觸發的多 writer
+  return Math.min(BACKOFF_CAP_MS, exp + jitter);
+}
+
 export async function withRetry<T>(
   label: string,
   fn: () => Promise<T>,
@@ -43,6 +89,10 @@ export async function withRetry<T>(
       lastErr = err;
       const retryable = isTransient(err);
       if (!retryable || attempt === tries) throw err;
+      // 冪等護欄「每次重試前」都查一次是刻意的:每一次 fn 重打都是一次可能的雙寫,
+      // 護欄必須在每次重打前擋。挪成「只在放棄前查一次」會讓中間幾次盲目重打 append =
+      // 放大雙寫,反而傷資料正確性。429 storm 下多這幾次讀的代價,由上面拉長的退避
+      // (Retry-After / 秒級 backoff → 更少、更晚的重打)抵掉。
       if (opts.alreadyDone) {
         try {
           if (await opts.alreadyDone()) {
@@ -53,7 +103,7 @@ export async function withRetry<T>(
           // 護欄查詢本身失敗就照常重試,不放大故障。
         }
       }
-      const backoff = 500 * 2 ** (attempt - 1); // 0.5s,1s,2s
+      const backoff = backoffMs(err, attempt);
       logger.warn(`${label} 第 ${attempt}/${tries} 次失敗,${backoff}ms 後重試`);
       await new Promise((r) => setTimeout(r, backoff));
     }
