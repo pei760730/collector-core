@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 import { groupKey } from "../src/pipeline/groupKey.js";
 
 interface DedupVectors {
+  schemaVersion: string;
   same_group: { name: string; urls: string[] }[];
   distinct: { name: string; urls: string[] }[];
   edge_cases: { name: string; why: string; url: string; expect: "id" | "path" }[];
@@ -26,6 +27,22 @@ const vectors: DedupVectors = JSON.parse(
 
 // path-fallback key 是砍 query 後的乾淨連結(以 http 開頭);id key 是平台前綴_id。
 const isPathKey = (k: string): boolean => k.startsWith("http");
+
+// 向量集完整性護欄:三個 describe 全用 `for (const … of vectors.xxx)` 動態註冊 it,
+// 測試強度 100% 綁在 vendored JSON 的內容。re-vendor 是手動流程(CI 抓不到 private voc),
+// 若某次覆蓋寫進被截斷 / 半份的 JSON(某陣列變 [],或少產 edge_cases),對應 for 迴圈跑 0 次、
+// 少註冊 it,整套仍全綠 —— 行為契約「不准鬆」的保證會靜默失效。這裡把目前基線硬釘死:
+// voc 縮向量(數量掉到基線以下)或改 schema 語義(schemaVersion bump)就會直接紅,逼人正視分叉。
+describe("voc 去重契約:向量集完整性(防截斷 re-vendor 靜默弱化)", () => {
+  it("schemaVersion 與 voc 對齊(改語義需雙側同步升版)", () => {
+    expect(vectors.schemaVersion).toBe("2");
+  });
+  it("各向量數不得低於目前基線", () => {
+    expect(vectors.same_group.length).toBeGreaterThanOrEqual(7);
+    expect(vectors.distinct.length).toBeGreaterThanOrEqual(3);
+    expect(vectors.edge_cases.length).toBeGreaterThanOrEqual(9);
+  });
+});
 
 describe("voc 去重契約:same_group 收斂同一 key", () => {
   for (const g of vectors.same_group) {
