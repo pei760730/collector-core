@@ -142,3 +142,52 @@ describe("cleanUrl", () => {
     });
   });
 });
+
+// ── TRACKING_PARAMS 快照 tripwire ─────────────────────────────────────────────
+// CLEAN_URL 是 feed 總表 gate 的 key、groupKey fallback 也吃它:TRACKING_PARAMS
+// 增刪一個參數 = 全艦隊(svb/clip/feed)同片可能清出不同 CLEAN_URL → gate 漏擋或
+// 誤合併。契約向量(contracts/voc/dedup_vectors.json)目前不覆蓋追蹤參數,所以
+// 這裡用行為快照釘死清單:改 cleanUrl.ts 的 Set 必須同步改這份清單——逼「有意識
+// 的決定」,不是順手刪一行靜默過關。
+describe("TRACKING_PARAMS 行為快照", () => {
+  const SNAPSHOT = [
+    "utm_source",
+    "utm_medium",
+    "utm_campaign",
+    "utm_term",
+    "utm_content",
+    "fbclid",
+    "gclid",
+    "msclkid",
+    "twclid",
+    "li_fat_id",
+    "igsh",
+    "igshid",
+    "xmt",
+    "slof",
+    "xsec_token",
+    "xsec_source",
+    "tt_from",
+    "s",
+    "mibextid",
+    "rdid",
+  ];
+
+  it("快照裡每個參數都被剝除(少剝一個 = 有人從 Set 刪了東西)", () => {
+    for (const p of SNAPSHOT) {
+      const out = cleanUrl(`https://example.com/a?${p}=x&keep=1`).cleanUrl;
+      expect(out, `param ${p} 應被剝除`).toBe("https://example.com/a?keep=1");
+    }
+  });
+
+  it("非快照參數不被剝除(多剝 = 有人往 Set 加了東西沒更新快照)", () => {
+    // 探測一批「像追蹤碼但不在清單」的名字,防止 Set 被悄悄擴張:
+    // 擴張本身可能是對的,但必須同步更新本快照 + 想清楚 fleet dedup 影響。
+    for (const p of ["ref", "source", "from", "share_id", "si", "feature"]) {
+      const out = cleanUrl(`https://example.com/a?${p}=x&keep=1`).cleanUrl;
+      expect(out, `param ${p} 不在快照,不該被剝`).toBe(
+        `https://example.com/a?${p}=x&keep=1`,
+      );
+    }
+  });
+});

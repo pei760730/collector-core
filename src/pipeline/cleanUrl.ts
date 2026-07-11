@@ -4,7 +4,13 @@
  */
 import type { CleanedUrl } from "../types.js";
 
-/** 要移除的追蹤參數。 */
+/**
+ * 要移除的追蹤參數。
+ * ⚠️ fleet 級行為:CLEAN_URL 是 feed 總表 gate 的 key、groupKey fallback 也吃它——
+ * 這個 Set 增刪一個參數,三個 consumer 的同片可能清出不同 CLEAN_URL(gate 漏擋)
+ * 或不同 URL 被誤合併。契約向量不覆蓋追蹤參數;守門在 tests/cleanUrl.test.ts 的
+ * 「TRACKING_PARAMS 行為快照」——改這裡必須同步改快照,讓增刪是有意識的決定。
+ */
 const TRACKING_PARAMS = new Set([
   "utm_source",
   "utm_medium",
