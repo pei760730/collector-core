@@ -146,7 +146,7 @@ jobs:
 
       - name: kai-notify 開單通知
         if: steps.detect.outputs.skip == 'false'
-        uses: pei760730/kai-notify@main
+        uses: pei760730/kai-notify@v1
         env:
           KAI_NOTIFY_BOT_TOKEN: ${{ secrets.KAI_NOTIFY_BOT_TOKEN }}
           KAI_NOTIFY_CHAT_ID: ${{ secrets.KAI_NOTIFY_CHAT_ID }}
@@ -155,7 +155,7 @@ jobs:
 
       - name: kai-notify 失敗告警
         if: failure()
-        uses: pei760730/kai-notify@main
+        uses: pei760730/kai-notify@v1
         env:
           KAI_NOTIFY_BOT_TOKEN: ${{ secrets.KAI_NOTIFY_BOT_TOKEN }}
           KAI_NOTIFY_CHAT_ID: ${{ secrets.KAI_NOTIFY_CHAT_ID }}
