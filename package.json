@@ -1,6 +1,6 @@
 {
   "name": "@pei760730/collector-core",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "三個短影音收集 collector 的共用核心 —— 純 pipeline + utils",
   "type": "module",
   "main": "./dist/index.js",
