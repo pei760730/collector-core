@@ -87,7 +87,7 @@ describe("boolEnv", () => {
     set(v);
     expect(boolEnv(KEY, false)).toBe(true);
   });
-  it.each(["0", "false", "no", "off", "banana"])("'%s' → false", (v) => {
+  it.each(["0", "false", "FALSE", "no", "off", " Off "])("'%s' → false", (v) => {
     set(v);
     expect(boolEnv(KEY, true)).toBe(false);
   });
@@ -97,6 +97,19 @@ describe("boolEnv", () => {
     expect(boolEnv(KEY, false)).toBe(false);
     set("  ");
     expect(boolEnv(KEY, true)).toBe(true);
+  });
+  // 白名單制(fail-fast,同 chatIdsEnv 哲學):打錯的值不准默默變 false ——
+  // "ture"/"enabled" 這種手滑會讓「以為開了的開關」靜默失效。
+  it.each(["ture", "enabled", "banana", "2", "t", "y"])("白名單外 '%s' → 丟錯", (v) => {
+    set(v);
+    expect(() => boolEnv(KEY, true)).toThrow(/不是合法布林值/);
+    expect(() => boolEnv(KEY, false)).toThrow(/不是合法布林值/);
+  });
+  it("錯誤訊息列出收到什麼與接受什麼", () => {
+    set("ture");
+    expect(() => boolEnv(KEY, false)).toThrow(/'ture'/);
+    expect(() => boolEnv(KEY, false)).toThrow(/1\/true\/yes\/on/);
+    expect(() => boolEnv(KEY, false)).toThrow(/0\/false\/no\/off/);
   });
 });
 

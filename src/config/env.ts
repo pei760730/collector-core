@@ -24,11 +24,26 @@ export function optional(name: string, fallback: string): string {
   return v && v.trim() !== "" ? v.trim() : fallback;
 }
 
-/** 布林環境變數:1/true/yes/on(不分大小寫)為 true;未設/空白 → fallback。 */
+/** boolEnv 真值/假值白名單(不分大小寫)。 */
+const BOOL_TRUE = ["1", "true", "yes", "on"] as const;
+const BOOL_FALSE = ["0", "false", "no", "off"] as const;
+
+/**
+ * 布林環境變數:白名單制。真值 1/true/yes/on、假值 0/false/no/off(皆不分大小寫);
+ * 未設/空白 → fallback;白名單以外(打錯的 "ture"/"enabled" 之類)直接丟錯 ——
+ * 與 chatIdsEnv 同一 fail-fast 哲學:打錯的值默默變 false,會讓「以為開了的開關」
+ * 靜默失效(舊版任何非真值一律回 false,就是這種坑)。
+ */
 export function boolEnv(name: string, fallback: boolean): boolean {
   const v = process.env[name];
   if (v == null || v.trim() === "") return fallback;
-  return ["1", "true", "yes", "on"].includes(v.trim().toLowerCase());
+  const t = v.trim().toLowerCase();
+  if ((BOOL_TRUE as readonly string[]).includes(t)) return true;
+  if ((BOOL_FALSE as readonly string[]).includes(t)) return false;
+  throw new Error(
+    `環境變數 ${name} 不是合法布林值,收到:'${v.trim()}'` +
+      `(接受:${BOOL_TRUE.join("/")} 或 ${BOOL_FALSE.join("/")},不分大小寫;未設/空白 = 用預設)`,
+  );
 }
 
 /** 限定值環境變數;不在白名單直接丟錯。 */
