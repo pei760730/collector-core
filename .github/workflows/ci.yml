@@ -16,11 +16,16 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    strategy:
+      # engines >=20,而 consumer-bump 驗證跑 node 22 —— core 自己的 CI 只測 20 會漏掉
+      # 「20 綠、22 紅」的缺口(bump 時才炸)。兩個版本都直接在這裡守。
+      matrix:
+        node: [20, 22]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci
       - run: npm run typecheck

@@ -62,6 +62,10 @@ describe("cleanUrl", () => {
     expect(cleanUrl("https://pros.is/ABCDEF").isShortUrl).toBe(true);
     expect(cleanUrl("https://myppt.cc/AbCdE").isShortUrl).toBe(true);
     expect(cleanUrl("https://s.id/abcde").isShortUrl).toBe(true);
+    // Facebook 官方短鏈(fb.me):detectPlatform 列為 FB 域但先前漏收於 SHORT_URL_HOSTS →
+    // 永不展開、永遠退路徑 key(2026-07-13 收進)。fb.watch 是正規影片域,不是短鏈。
+    expect(cleanUrl("https://fb.me/AbCdEf").isShortUrl).toBe(true);
+    expect(cleanUrl("https://fb.watch/xYz123").isShortUrl).toBe(false);
     // 刻意不收的非影片分享短鏈 → false。
     expect(cleanUrl("https://forms.gle/AbCdEf").isShortUrl).toBe(false);
     expect(cleanUrl("https://a.co/d/abcDEf").isShortUrl).toBe(false);

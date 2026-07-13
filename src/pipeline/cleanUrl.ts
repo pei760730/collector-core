@@ -86,6 +86,9 @@ const SHORT_URL_HOSTS = new Set([
   "v.douyin.com",
   // 小紅書分享短鏈:展開成 xiaohongshu.com/explore/<hex> 才抽得到 xhs_<hex> 去重。
   "xhslink.com",
+  // Facebook 官方短鏈(302 到 facebook.com 目標)。detectPlatform 一直把它列為 FB 域,
+  // 但之前漏收在這裡 → 永不展開、抽不到 fb id、永遠退路徑 key(2026-07-13 audit LOW 收進)。
+  "fb.me",
 ]);
 
 /**
