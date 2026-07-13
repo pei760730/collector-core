@@ -62,6 +62,22 @@
         "https://www.facebook.com/watch?v=5566778899",
         "https://facebook.com/watch?v=5566778899"
       ]
+    },
+    {
+      "name": "threads-跨host同帖收斂",
+      "why": "threads.net 與 threads.com 是同站雙域(官方 2024 遷移主域),同一 /post/<code> 抽 id 帶 threads 命名空間 → 跨 host 收斂同 key。三引擎(voc/tbvoc/core)行為已一致,2026-07-13 補釘防回歸",
+      "urls": [
+        "https://www.threads.net/@user/post/C8abcDEFgh1",
+        "https://www.threads.com/@user/post/C8abcDEFgh1"
+      ]
+    },
+    {
+      "name": "instagram-reel單複數同片收斂",
+      "why": "IG /reel/<code> 與 /reels/<code> 是同一支 Reel 的兩種路徑形態,`reels?` pattern 抽同 shortcode → 同群。三引擎行為已一致,2026-07-13 補釘防回歸",
+      "urls": [
+        "https://www.instagram.com/reel/DGabcXYZ123",
+        "https://www.instagram.com/reels/DGabcXYZ123"
+      ]
     }
   ],
   "distinct": [
