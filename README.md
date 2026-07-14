@@ -1,6 +1,6 @@
 # @pei760730/collector-core
 
-三個短影音收集 collector(short-video-bot / clip-collector / feed-collector)的**共用核心**。Internal use only。
+短影音收集 collector 的**共用核心**(#9 三併一後唯一消費者 = `pei760730/collector`,以 voc/tbvoc/of 三 target 消費;原 short-video-bot / clip-collector / feed-collector 三 repo 已於 2026-07-15 合一,舊 repo archive)。Internal use only。
 
 ## 為什麼
 
