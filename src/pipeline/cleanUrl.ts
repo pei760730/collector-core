@@ -47,7 +47,8 @@ const MOBILE_TO_DESKTOP: Record<string, string> = {
 };
 
 /**
- * 已知短網址服務 host(core 與 feed-collector 兩份必須一致)。
+ * 已知短網址服務 host(SSOT 在此;原「與 feed-collector 兩份必須一致」的同步義務
+ * 已於 2026-07-15 #9 三併一失效——該 repo 併入 collector 並 archive,消費端直接 import core)。
  * 用途:不展開的話短鏈跟展開後長鏈算出不同去重 key → 漏去重。EXPAND_SHORT_URLS=true 時
  * 用 expandShortUrl(follow redirect)展開;展開失敗會優雅退回原值(不會更糟)。
  * 2026-06-27 補台/中常見分享短鏈(實測會 302 到目標):reurl.cc/pse.is/lihi*.cc/s.id/
