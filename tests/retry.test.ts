@@ -165,3 +165,25 @@ describe("withRetry 退避重試", () => {
     expect(nums.every((d) => d < 5000)).toBe(true);
   });
 });
+
+describe("403 quota 暫態(audit #1)", () => {
+  it("403 帶 Retry-After 表頭 → 暫態(配額)", () => {
+    expect(
+      isTransient({ code: 403, response: { status: 403, headers: { "retry-after": "30" } } }),
+    ).toBe(true);
+  });
+  it("403 帶 rateLimit reason → 暫態", () => {
+    expect(isTransient({ code: 403, errors: [{ reason: "userRateLimitExceeded" }] })).toBe(true);
+    expect(
+      isTransient({
+        response: { status: 403, data: { error: { errors: [{ reason: "rateLimitExceeded" }] } } },
+      }),
+    ).toBe(true);
+  });
+  it("純權限 403(無配額訊號)仍 fail-fast", () => {
+    expect(isTransient({ code: 403 })).toBe(false);
+    expect(
+      isTransient({ response: { status: 403, data: { error: { status: "PERMISSION_DENIED" } } } }),
+    ).toBe(false);
+  });
+});

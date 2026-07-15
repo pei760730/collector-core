@@ -101,7 +101,10 @@ const SHORT_URL_HOSTS = new Set([
 function unwrapFacebookRedirect(url: URL): string | null {
   const host = url.hostname.toLowerCase();
   if (host !== "l.facebook.com" && host !== "lm.facebook.com") return null;
-  return url.searchParams.get("u");
+  const inner = url.searchParams.get("u");
+  // u= 存在但空(present-but-empty)時 .get 回 ""(非 null),外層遞迴 cleanUrl("") → "https:" 垃圾列。
+  // 空/純空白 → 當作非轉址,讓外層照原 URL 正常處理。
+  return inner && inner.trim() ? inner : null;
 }
 
 /** 是否為已知短網址服務(供 collect 決定要不要展開)。 */
