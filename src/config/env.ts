@@ -71,7 +71,15 @@ export function chatIdsEnv(name: string): number[] {
     if (!/^-?\d+$/.test(t)) {
       throw new Error(`環境變數 ${name} 內含非整數 chat id:'${t}'(請用逗號分隔的純數字 id)`);
     }
-    return Number(t);
+    const n = Number(t);
+    // Number() 會把 > 2^53 的 id 靜默進位成別的數(白名單就授權/擋錯人,同型的「靜默失準」)。
+    // Telegram 已朝 64-bit id 演進 → 直接擋、別默默失準。
+    if (!Number.isSafeInteger(n)) {
+      throw new Error(
+        `環境變數 ${name} 的 chat id 超出安全整數範圍:'${t}'(> 2^53 會被靜默進位、授權失準;請確認 id)`,
+      );
+    }
+    return n;
   });
 }
 

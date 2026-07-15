@@ -195,3 +195,18 @@ describe("TRACKING_PARAMS 行為快照", () => {
     }
   });
 });
+
+describe("Facebook 轉址空 u=(audit #5)", () => {
+  it("u= 空字串 → 不當轉址,不產生 'https:' 垃圾", () => {
+    const { cleanUrl: out } = cleanUrl("https://l.facebook.com/l.php?u=");
+    expect(out).not.toBe("https:");
+    expect(out).toContain("facebook.com");
+  });
+  it("u= 有值 → 照舊解開內層真網址", () => {
+    const { cleanUrl: out } = cleanUrl(
+      "https://l.facebook.com/l.php?u=" +
+        encodeURIComponent("https://www.tiktok.com/@x/video/111"),
+    );
+    expect(out).toContain("tiktok.com");
+  });
+});

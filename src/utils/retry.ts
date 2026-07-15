@@ -11,12 +11,42 @@
  */
 import { logger } from "./logger.js";
 
+/**
+ * 403 只有在「配額/速率」語意下才暫態;純權限 403 維持 fail-fast。
+ * 訊號:回了 Retry-After 表頭,或 Google reason ∈ rate/quota exhausted。
+ */
+function isQuota403(e: {
+  response?: { headers?: Record<string, unknown>; data?: unknown };
+  errors?: Array<{ reason?: string }>;
+}): boolean {
+  const headers = e?.response?.headers ?? {};
+  if (headers["retry-after"] != null || headers["Retry-After"] != null) return true;
+  const data = e?.response?.data as
+    | { error?: { errors?: Array<{ reason?: string }>; status?: string } }
+    | undefined;
+  const reason =
+    e?.errors?.[0]?.reason ?? data?.error?.errors?.[0]?.reason ?? data?.error?.status;
+  return (
+    typeof reason === "string" &&
+    /rateLimitExceeded|userRateLimitExceeded|quotaExceeded|RESOURCE_EXHAUSTED/i.test(reason)
+  );
+}
+
 export function isTransient(err: unknown): boolean {
-  const e = err as { code?: number | string; response?: { status?: number }; message?: string };
+  const e = err as {
+    code?: number | string;
+    response?: { status?: number; headers?: Record<string, unknown>; data?: unknown };
+    errors?: Array<{ reason?: string }>;
+    message?: string;
+  };
   const httpCode = typeof e?.code === "number" ? e.code : e?.response?.status;
   if (httpCode === 429 || (typeof httpCode === "number" && httpCode >= 500 && httpCode < 600)) {
     return true;
   }
+  // 403 quota:Google Sheets/Drive 的 userRateLimitExceeded 常回 403(非 429),舊碼一律
+  // fail-fast → parseRetryAfterMs 的「403 quota」分支永遠打不到。只在帶配額訊號時暫態,
+  // 純權限 403 仍 fail-fast(不重試打不開的權限)。
+  if (httpCode === 403 && isQuota403(e)) return true;
   const codeStr = typeof e?.code === "string" ? e.code : "";
   const msg = String(e?.message ?? "");
   return (
