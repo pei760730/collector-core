@@ -51,3 +51,25 @@ export {
   readNamedRow,
   type HeaderLayout,
 } from "./sheets/headerMap.js";
+// ── 2026-07-17 上移批次:collector 殼/of 引擎逐字雙份的 target 無關積木(additive)──
+export {
+  drainUpdates,
+  exitCodeFor,
+  type DrainableUpdate,
+  type DrainableBot,
+  type PersistFlag,
+  type DrainResult,
+  type DrainOptions,
+} from "./drain/loop.js";
+export {
+  makeWhitelistGuard,
+  maskId,
+  type WhitelistGuard,
+  type WhitelistGuardOptions,
+  type GuardContext,
+  type GuardLogger,
+} from "./guard/whitelist.js";
+export { makeErrorNotifier, errText, type ErrorNotifierOptions } from "./guard/notify.js";
+export { makeSerializer } from "./utils/serialize.js";
+export { oncePromise } from "./utils/once.js";
+export { capList, clipTelegramText } from "./utils/text.js";
