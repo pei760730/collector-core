@@ -9,7 +9,8 @@
 ## 內容
 
 - **pipeline**(純函式,無 I/O):`parseMessage` · `cleanUrl` · `detectPlatform` · `extractVideoId` · `groupKey`
-- **utils**:`todayIsoTaipei`/`parseSheetDate`/`ageInDays`(Asia/Taipei)· `expandShortUrl` · `logger`
+- **utils**:`todayIsoTaipei`/`parseSheetDate`/`ageInDays`(Asia/Taipei)· `expandShortUrl` · `logger` · `makeSerializer` · `oncePromise` · `capList`/`clipTelegramText`
+- **drain / guard**(結構型別,零 telegraf 依賴;2026-07-17 自 collector 殼/of 引擎逐字雙份上移):`drainUpdates`/`exitCodeFor` · `makeWhitelistGuard`/`maskId` · `makeErrorNotifier`/`errText` —— per-engine 文案分岔(persistLabel/deniedMsg/冒號全半形)以參數注入,不燒進 core
 
 > adapter 契約 / `loadEngineSchema`(staging 統一化預備設計)已於 2026-07-03 解散:PR-7 判不做、零消費端。要復活從 git 歷史(≤v0.2.2)撈。
 
