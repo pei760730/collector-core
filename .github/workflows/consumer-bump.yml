@@ -1,6 +1,6 @@
 name: consumer-bump (reusable)
 
-# 消費端(sv-bot / clip / feed)的 collector-core 自動 bump——單一實作放 core(SSOT,避免三份殼各自漂移)。
+# 消費端 collector(voc/tbvoc/of 三 target,唯一 caller;原 sv-bot / clip / feed 已於 2026-07-15 #9 併一 archive)的 collector-core 自動 bump——單一實作放 core(SSOT)。
 # 呼叫方式:各消費 repo 的 .github/workflows/core-bump.yml 每日 cron `uses` 本 workflow(secrets: inherit,
 # 本檔 workflow_call.secrets 顯式宣告用到哪些;job 自帶最小 permissions + 自保 concurrency,見 jobs.bump)。
 # 行為:偵測 core 最新 tag → 照 README 發版節 surgical 編輯 lock(spec / resolved / version 三處,不重生 lock)
@@ -24,7 +24,7 @@ jobs:
   bump:
     runs-on: ubuntu-latest
     # 自帶最小權限(called workflow 只能降不能升):caller 若日後誤給過寬(如 write-all),
-    # 本 job 實際拿到的仍只有這三項 —— 與三個 caller 現行宣告一致。
+    # 本 job 實際拿到的仍只有這三項 —— 與 caller(collector 的 core-bump.yml)現行宣告一致。
     permissions:
       contents: write # push bump branch
       pull-requests: write # 開 bump PR

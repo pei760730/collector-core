@@ -6,7 +6,7 @@
  *
  * 2026-07-13:`export *` 收斂為具名匯出 —— 星號會把模組內部積木(tidyUrl/cleanNote/
  * isValidHttpUrl 這類 parse 的私有工具)一併凍進公開 API,semver 面被動膨脹。
- * 這裡列的就是公開契約:三個 consumer(short-video-bot/clip-collector/feed-collector)
+ * 這裡列的就是公開契約:唯一 consumer pei760730/collector(voc/tbvoc/of 三 target;原 short-video-bot/clip-collector/feed-collector 已於 2026-07-15 #9 併一 archive)
  * 實際 import 的每一個名字都在,新增匯出 = 有意識地擴約(在此顯式加一行)。
  *
  * 註:adapter.ts + schema.ts(staging 統一化預備設計)已於 2026-07-03 解散——PR-7 判不做、
