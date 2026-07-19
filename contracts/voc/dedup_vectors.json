@@ -1,5 +1,5 @@
 {
-  "_note": "跨語言去重契約向量(canonical)。Python 側 voc(normalize.dedup_key)與 TeaBus-VOC(tbvoc cli._dedup_key)、TS 側 collector-core(pipeline.groupKey)+ short-video-bot + clip-collector 都對這份共跑,保證『分群等價』(格式 : vs _ 允許不同)。voc 與 tbvoc 經 2026-06-27 對齊後分群完全一致,故共用同一份。改去重規則前先改這裡、各側測試會先紅。守門:voc/tbvoc tests/test_dedup_contract.py、core tests/dedupConformance.test.ts(+ sv-bot/clip vendored 同名)。",
+  "_note": "跨語言去重契約向量(canonical 在 pei760730/voc;本檔為 vendored 副本)。Python 側 voc(normalize.dedup_key)與 TeaBus-VOC(tbvoc cli._dedup_key)、TS 側 collector-core(pipeline.groupKey,經 collector 三 target 消費)都對這份共跑,保證『分群等價』(格式 : vs _ 允許不同)。voc 與 tbvoc 經 2026-06-27 對齊後分群完全一致,故共用同一份。改去重規則前先改這裡、各側測試會先紅。守門:voc/tbvoc tests/test_dedup_contract.py、core tests/dedupConformance.test.ts。(原 sv-bot/clip 各自 vendored 同名,已於 2026-07-15 #9 併入 collector archive。)",
   "schemaVersion": "2",
   "same_group": [
     {

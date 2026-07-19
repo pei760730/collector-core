@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 /**
  * collector-core 發版小工具 —— 讓 git tag 與 package.json version 永遠同步,
- * 並把消費端(sv-bot/clip)bump 的踩坑寫成提醒,避免每次重跳那套舞步。
+ * 並把消費端(collector)bump 的踩坑寫成提醒,避免每次重跳那套舞步。
  *
  * 用法:
  *   1. 先在 package.json 把 version 改成新版(例 0.1.4)。
  *   2. `npm run release`        → 驗證 tree 乾淨 + build + test 過 → 打 annotated tag v<version>
  *                                 並 push 當前分支 + tag。
- *   3. 消費端 sv-bot/clip 把 dep 改 `#v<version>`,**用 surgical lock 編輯**(見下),npm ci 驗。
+ *   3. 消費端 collector 把 dep 改 `#v<version>`,**用 surgical lock 編輯**(見下),npm ci 驗。
  *
  * 為何不自動化消費端:它們的 package-lock pin 的是 commit hash,且**在 macOS 重生 lock 會掉
  * `@rollup/rollup-linux-x64-gnu` optional dep(npm/cli#4828)→ linux CI 啟動失敗**。正解是
