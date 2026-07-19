@@ -93,11 +93,16 @@ function parseRetryAfterMs(err: unknown, now: number = Date.now()): number | und
   return undefined;
 }
 
-/** 本次重試前該等多久:Retry-After 優先;否則 429 走秒級基準、其餘走 500ms 基準,均加 full jitter。 */
+/** 本次重試前該等多久:Retry-After 優先;否則配額錯誤(429 或 403 quota)走秒級基準、
+ * 其餘走 500ms 基準,均加 full jitter。403 quota 與 429 同屬「每分鐘配額」語意,若掉回 500ms
+ * 基準會 0.5/1/2s 全燒在配額窗內、4 次注定失敗(見上 429 註解),故與 429 同層。 */
 function backoffMs(err: unknown, attempt: number): number {
   const retryAfter = parseRetryAfterMs(err);
   if (retryAfter !== undefined) return retryAfter;
-  const base = httpStatus(err) === 429 ? BACKOFF_BASE_429_MS : BACKOFF_BASE_MS;
+  const st = httpStatus(err);
+  const isQuotaTier =
+    st === 429 || (st === 403 && isQuota403(err as Parameters<typeof isQuota403>[0]));
+  const base = isQuotaTier ? BACKOFF_BASE_429_MS : BACKOFF_BASE_MS;
   const exp = Math.min(BACKOFF_CAP_MS, base * 2 ** (attempt - 1));
   const jitter = Math.floor(Math.random() * base); // full jitter,打散同時觸發的多 writer
   return Math.min(BACKOFF_CAP_MS, exp + jitter);

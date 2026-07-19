@@ -164,6 +164,21 @@ describe("withRetry 退避重試", () => {
     expect(nums.some((d) => d >= 500 && d < 5000)).toBe(true);
     expect(nums.every((d) => d < 5000)).toBe(true);
   });
+
+  // 403 quota 同 429 是「每分鐘配額」語意,但 Google 常不回 Retry-After。若退避掉回 500ms 基準,
+  // 0.5/1/2s 全燒在配額窗內、4 次注定失敗——與 429 秒級退避的用意相同,403-quota 也必須走秒級。
+  it("403 quota(無 Retry-After)退避基準為秒級,不掉回 500ms 硬窗", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const fn = vi.fn(async () => {
+      throw { code: 403, errors: [{ reason: "userRateLimitExceeded" }] };
+    });
+    const p = withRetry("append", fn, { tries: 2 });
+    const assertion = expect(p).rejects.toMatchObject({ code: 403 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    const delays = setTimeoutSpy.mock.calls.map((c) => c[1]);
+    expect(delays.some((d) => typeof d === "number" && d >= 5000)).toBe(true);
+  });
 });
 
 describe("403 quota 暫態(audit #1)", () => {
