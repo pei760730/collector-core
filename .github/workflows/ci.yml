@@ -30,3 +30,6 @@ jobs:
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
+      # typecheck 用 declaration:false,宣告檔限定錯誤(TS4023/TS2742 類)不會在上面兩步現形;
+      # 少了這步,壞宣告的 PR 會綠著 merge,炸點延後到 release.mjs 本機 build 或消費端 npm ci 的 prepare。
+      - run: npm run build
