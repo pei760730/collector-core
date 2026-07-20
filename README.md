@@ -4,12 +4,13 @@
 
 ## 為什麼
 
-三個 collector 是同一引擎開三份、各接不同下游(voc / TeaBus-VOC / of-content-engine)。原本 pipeline 修補要手貼三遍、已在漂移。把「全引擎事實一致」的部分抽成這個版本化套件,改一次三邊吃到;per-engine 差異(寫入模型 / schema / dedup / STATUS)留各 collector 的 adapter。
+三個 collector 原是同一引擎開三份、各接不同下游(voc / TeaBus-VOC / of-content-engine)。當時 pipeline 修補要手貼三遍、已在漂移。把「全引擎事實一致」的部分抽成這個版本化套件,改一次三邊吃到;per-engine 差異(寫入模型 / schema / dedup / STATUS)留各 target 的 adapter(#9 併一後「三邊」= `collector` 單 repo 的 voc/tbvoc/of 三 target)。
 
 ## 內容
 
 - **pipeline**(純函式,無 I/O):`parseMessage` · `cleanUrl` · `detectPlatform` · `extractVideoId` · `groupKey`
-- **utils**:`todayIsoTaipei`/`parseSheetDate`/`ageInDays`(Asia/Taipei)· `expandShortUrl` · `logger` · `makeSerializer` · `oncePromise` · `capList`/`clipTelegramText`
+- **utils**:`todayIsoTaipei`/`parseSheetDate`/`ageInDays`(Asia/Taipei)· `expandShortUrl` · `logger` · `withRetry`/`isTransient` · `makeSerializer` · `oncePromise` · `capList`/`clipTelegramText`
+- **config / sheets**(0.3.0 上移):env 載入 `required`/`optional`/`boolEnv`/`enumEnv`/`chatIdsEnv`/`loadGoogleCredentials` · headerMap `colLetter`/`resolveHeaderIndexes`/`placeRow`/`readNamedRow`
 - **drain / guard**(結構型別,零 telegraf 依賴;2026-07-17 自 collector 殼/of 引擎逐字雙份上移):`drainUpdates`/`exitCodeFor` · `makeWhitelistGuard`/`maskId` · `makeErrorNotifier`/`errText` —— per-engine 文案分岔(persistLabel/deniedMsg/冒號全半形)以參數注入,不燒進 core
 
 > adapter 契約 / `loadEngineSchema`(staging 統一化預備設計)已於 2026-07-03 解散:PR-7 判不做、零消費端。要復活從 git 歷史(≤v0.2.2)撈。
