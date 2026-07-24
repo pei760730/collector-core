@@ -41,7 +41,14 @@ export async function expandShortUrl(url: string, timeoutMs = 5000): Promise<str
       return headUrl;
     }
   } catch (err) {
-    logger.warn(`短網址展開失敗,沿用原網址:${url}`, err);
+    // public repo 的 Actions log 誰都看得到:只印 host,不印完整 URL(短網址路徑常含識別碼)。
+    let host = "unknown-host";
+    try {
+      host = new URL(url).hostname;
+    } catch {
+      // 非法 URL 就維持 fallback 字樣
+    }
+    logger.warn(`短網址展開失敗(host=${host}),沿用原網址`, err);
     return url;
   }
 }
