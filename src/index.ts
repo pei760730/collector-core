@@ -51,25 +51,8 @@ export {
   readNamedRow,
   type HeaderLayout,
 } from "./sheets/headerMap.js";
-// ── 2026-07-17 上移批次:collector 殼/of 引擎逐字雙份的 target 無關積木(additive)──
-export {
-  drainUpdates,
-  exitCodeFor,
-  type DrainableUpdate,
-  type DrainableBot,
-  type PersistFlag,
-  type DrainResult,
-  type DrainOptions,
-} from "./drain/loop.js";
-export {
-  makeWhitelistGuard,
-  maskId,
-  type WhitelistGuard,
-  type WhitelistGuardOptions,
-  type GuardContext,
-  type GuardLogger,
-} from "./guard/whitelist.js";
-export { makeErrorNotifier, errText, type ErrorNotifierOptions } from "./guard/notify.js";
-export { makeSerializer } from "./utils/serialize.js";
-export { oncePromise } from "./utils/once.js";
-export { capList, clipTelegramText } from "./utils/text.js";
+// ── 2026-07-17 上移批次已於 2026-07-25 revert(Kai 拍板)──
+// drain/guard/serialize/once/text 六模組發版一週零消費端、與 collector vendored 版
+// API 已分岔(drainUpdates 第三參數)。core 的存在理由=跨語言去重契約+純 pipeline;
+// bot 殼機械(drain/白名單/序列鎖)只有一支 bot 在用,單一消費者的共用庫=假抽象,
+// vendored 版是正本。哪天出現第二支 bot 再上移(git 歷史 ≤v0.3.7 就是備份)。
