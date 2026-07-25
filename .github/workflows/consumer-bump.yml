@@ -43,7 +43,7 @@ jobs:
     steps:
       # cron 事件永遠跑在消費 repo 的 default branch;workflow_dispatch 選其他 ref = 測試路徑
       # (bump branch 會從該 ref 切出,PR base 仍是 main)。
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: 偵測目前版 vs core 最新 tag
         id: detect
@@ -86,7 +86,7 @@ jobs:
           });'
           git diff --stat
 
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@v7
         if: steps.detect.outputs.skip == 'false'
         with:
           node-version: 22
