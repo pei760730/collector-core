@@ -25,6 +25,8 @@ on:
 jobs:
   bump:
     runs-on: ubuntu-latest
+    # 實測最長 14.4 分(collector 近 29 次 core-bump);不設就是吃 360 分鐘預設。呼叫端的 job 用 uses: 呼叫本 workflow,那種 job 不能設 timeout-minutes,所以上限只能設在這裡
+    timeout-minutes: 30
     # 自帶最小權限(called workflow 只能降不能升):caller 若日後誤給過寬(如 write-all),
     # 本 job 實際拿到的仍只有這三項 —— 與 caller(collector 的 core-bump.yml)現行宣告一致。
     permissions:
