@@ -16,6 +16,8 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    # 實測最長 9.2 分、中位 0.4 分(近 18 次成功);不設就是吃 360 分鐘預設
+    timeout-minutes: 20
     strategy:
       # engines >=20,而 consumer-bump 驗證跑 node 22 —— core 自己的 CI 只測 20 會漏掉
       # 「20 綠、22 紅」的缺口(bump 時才炸)。兩個版本都直接在這裡守。
