@@ -8,8 +8,9 @@
 
 ## 紅線(違反即停)
 
-- **vendored=正本**:collector 內的 vendored core 是正本、本 repo 隨發版同步;「把批次邏輯上移進 core」已由 Kai 拍板 revert(2026-07-25),**勿再提上移**。
-- 發版走 git tag;consumer bump 自動化只剩 collector 一支 caller,改介面先看 `contracts/`。
+- **消費模型=npm git-tag 依賴**:collector 以 `github:pei760730/collector-core#vX.Y.Z` 直接依賴本 repo(無 vendored 副本)。發版=推 tag → consumer-bump 自動對 collector 開 bump PR(鏈已實證健康,collector PR #87)。
+- 「把批次邏輯上移進 core」已由 Kai 拍板 revert(2026-07-25):批次/drain 編排留在 collector,core 只收純函式——**勿再提上移**。
+- 改介面先看 `contracts/`;consumer bump 自動化只剩 collector 一支 caller。
 - 純函式紀律:core 不碰 I/O / secrets / 平台 API——那些留在 collector 端。
 
 ## 驗證
