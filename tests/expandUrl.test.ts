@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { expandShortUrl } from "../src/utils/expandUrl.js";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
 
 function mockFetch(impl: (url: string, opts: { method: string }) => Promise<{ url?: string }>) {
   vi.stubGlobal(
@@ -42,6 +45,32 @@ describe("expandShortUrl", () => {
     });
     const out = await expandShortUrl("https://v.douyin.com/ABC/");
     expect(out).toBe("https://v.douyin.com/ABC/");
+  });
+
+  it("HEAD 同 host 但已正規化路徑、GET 失敗 → 沿用 HEAD 結果而非原網址", async () => {
+    mockFetch(async (_url, opts) => {
+      if (opts.method === "HEAD") return { url: "https://v.douyin.com/canonical/" };
+      throw new Error("network");
+    });
+    expect(await expandShortUrl("https://v.douyin.com/ABC/")).toBe(
+      "https://v.douyin.com/canonical/",
+    );
+  });
+
+  it("空的 response.url 退回請求網址", async () => {
+    mockFetch(async () => ({ url: "" }));
+    expect(await expandShortUrl("https://vm.tiktok.com/ZABC/")).toBe(
+      "https://vm.tiktok.com/ZABC/",
+    );
+  });
+
+  it("預設 timeout 為 5000ms，且請求完成後清除 timer", async () => {
+    const setTimer = vi.spyOn(globalThis, "setTimeout");
+    const clearTimer = vi.spyOn(globalThis, "clearTimeout");
+    mockFetch(async () => ({ url: "https://www.tiktok.com/@u/video/123" }));
+    await expandShortUrl("https://vm.tiktok.com/ZABC/");
+    expect(setTimer).toHaveBeenCalledWith(expect.any(Function), 5000);
+    expect(clearTimer).toHaveBeenCalledTimes(1);
   });
 
   it("HEAD 丟錯 → 沿用原網址", async () => {

@@ -49,6 +49,11 @@ describe("groupKey 分群", () => {
   it("認不出平台退路徑 key(砍 query、去尾斜線、lower)", () => {
     expect(groupKey("https://EXAMPLE.com/a/?utm=1")).toBe("https://example.com/a");
   });
+
+  it("輸入頭尾空白不改變去重 key", () => {
+    expect(groupKey("  https://youtu.be/dQw4w9WgXcQ  ")).toBe("yt_dqw4w9wgxcq");
+    expect(groupKey("  https://example.com/a?utm=1  ")).toBe("https://example.com/a");
+  });
 });
 
 describe("groupKey(url, pre?) 預計算 overload:與預設路徑分群等價", () => {

@@ -90,4 +90,12 @@ describe("placeRow / readNamedRow:飄移列來回對得上", () => {
     const cells = placeRow(original, COLUMNS, layout);
     expect(readNamedRow(cells, COLUMNS, layout)).toEqual(original);
   });
+
+  it("placeRow 保留數字 0，缺索引欄則略過且不汙染其他欄", () => {
+    const defensiveLayout = { indexOf: { 平台: 1 }, width: 2 };
+    expect(placeRow({ 平台: 0, 連結: "ignored" }, ["平台", "連結"], defensiveLayout)).toEqual([
+      "",
+      "0",
+    ]);
+  });
 });
