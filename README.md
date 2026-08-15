@@ -9,11 +9,15 @@
 ## 內容
 
 - **pipeline**(純函式,無 I/O):`parseMessage` · `cleanUrl` · `detectPlatform` · `extractVideoId` · `groupKey`
-- **utils**:`todayIsoTaipei`/`parseSheetDate`/`ageInDays`(Asia/Taipei)· `expandShortUrl` · `logger` · `withRetry`/`isTransient` · `makeSerializer` · `oncePromise` · `capList`/`clipTelegramText`
+- **utils**:`TZ`/`todayIsoTaipei`/`parseSheetDate`/`ageInDays`(Asia/Taipei)· `expandShortUrl` · `logger` · `withRetry`/`isTransient`
 - **config / sheets**(0.3.0 上移):env 載入 `required`/`optional`/`boolEnv`/`enumEnv`/`chatIdsEnv`/`loadGoogleCredentials` · headerMap `colLetter`/`resolveHeaderIndexes`/`placeRow`/`readNamedRow`
-- **drain / guard**(結構型別,零 telegraf 依賴;2026-07-17 自 collector 殼/of 引擎逐字雙份上移):`drainUpdates`/`exitCodeFor` · `makeWhitelistGuard`/`maskId` · `makeErrorNotifier`/`errText` —— per-engine 文案分岔(persistLabel/deniedMsg/冒號全半形)以參數注入,不燒進 core
 
-> adapter 契約 / `loadEngineSchema`(staging 統一化預備設計)已於 2026-07-03 解散:PR-7 判不做、零消費端。要復活從 git 歷史(≤v0.2.2)撈。
+完整清單以 [`src/index.ts`](src/index.ts) 為準,並由 `tests/publicApi.test.ts` 的匯出面快照守門(增刪匯出 = 必須同步改那份名單,不會靠人記得)。
+
+> **已解散、不要照舊文件找的東西**(留著只為了讓下一個人不用翻 git log):
+> - **drain / guard / serialize / once / text** 六模組:2026-07-17 上移、2026-07-25 由 Kai 拍板 revert(發版一週零消費端,bot 殼機械只有一支 bot 在用 = 假抽象)。正本是 collector 的 vendored 版,**勿再提上移**。備份在 git 歷史 ≤v0.3.7。
+> - **adapter 契約 / `loadEngineSchema`**(staging 統一化預備設計):2026-07-03 解散,PR-7 判不做、零消費端。備份在 git 歷史 ≤v0.2.2。
+> - **`GroupKeyPrecomputed`**(groupKey 預計算 overload):2026-08-15 刪,零消費端且帶「兩欄必須同一條 url,傳錯就分群錯」的正確性地雷。備份在 git 歷史 ≤v0.4.0。
 
 ## 不變式
 

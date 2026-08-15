@@ -30,7 +30,7 @@ export {
   iconFor,
 } from "./pipeline/detectPlatform.js";
 export { extractVideoId } from "./pipeline/extractVideoId.js";
-export { groupKey, type GroupKeyPrecomputed } from "./pipeline/groupKey.js";
+export { groupKey } from "./pipeline/groupKey.js";
 export { TZ, todayIsoTaipei, parseSheetDate, ageInDays } from "./utils/date.js";
 export { expandShortUrl } from "./utils/expandUrl.js";
 export { logger } from "./utils/logger.js";

@@ -10,33 +10,18 @@
  * 格式(分隔符 `_` vs 引擎 `:`)允許不同,只保證**分群等價** —— 引擎側 contracts/dedup_vectors.json
  * 跨語言守門(各 collector 的 conformance 對著跑)。
  */
-import type { PlatformInfo, VideoIdInfo } from "../types.js";
 import { detectPlatform } from "./detectPlatform.js";
 import { extractVideoId } from "./extractVideoId.js";
 
-/**
- * groupKey 的預計算輸入(效能用,opt-in)。assembleDraft 這類呼叫端本來就先跑過
- * detectPlatform / extractVideoId(同一條 URL),再叫 groupKey 會整套重跑
- * (`new URL` ×2 + regex 比對,~4-5 次解析/列)——傳進來即可跳過重算。
- * ⚠️ 正確性契約:兩欄都必須是用**同一個 url 參數**算出來的結果;傳別條 URL 的結果
- * 進來 = 分群直接錯。不確定就別傳(預設路徑自算,行為不變)。
- */
-export interface GroupKeyPrecomputed {
-  /** `detectPlatform(url)` 的結果。 */
-  platform: PlatformInfo;
-  /** `extractVideoId(platform.platform, url)` 的結果;省略則自算(僅 domain_match 用到)。 */
-  videoId?: VideoIdInfo;
-}
-
-// 顯式 overload:讓 `urls.map(groupKey)` 這種 point-free 用法(map 會多塞 index)
-// 仍能匹配單參數簽名 —— 選用參數版單一簽名會讓既有呼叫端型別紅掉。
-export function groupKey(url: string): string;
-export function groupKey(url: string, pre: GroupKeyPrecomputed): string;
-export function groupKey(url: string, pre?: GroupKeyPrecomputed): string {
+// 2026-08-15:`GroupKeyPrecomputed` 預計算 overload 已刪。發版後零消費端(collector 的
+// 15 處 dedupKey/groupKey 呼叫全是單參數),而它帶一顆正確性地雷 —— 兩欄必須來自同一條 url,
+// 傳錯就是分群直接錯。沒人收的效能優化換一個 footgun + 一組多餘 overload,不划算。
+// 真要重啟:git 歷史(≤v0.4.0)就是備份,且要先有實測到的熱點再談。
+export function groupKey(url: string): string {
   const u = (url ?? "").trim();
-  const platform = pre?.platform ?? detectPlatform(u);
+  const platform = detectPlatform(u);
   if (platform.method === "domain_match") {
-    const vid = pre?.videoId ?? extractVideoId(platform.platform, u);
+    const vid = extractVideoId(platform.platform, u);
     if (!vid.unsupported) return vid.videoId.trim().toLowerCase();
   }
   return u
