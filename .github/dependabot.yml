@@ -45,6 +45,11 @@ updates:
       # TS 5.9→7.0/6.0 打爆 typecheck、vitest 3→4 剛出爐、@types/node 26=
       # Node 26 型別但 CI 跑 20/22 —— types 該釘 runtime 線)。
       # 大版升級走 deliberate PR:本機實跑 typecheck+test 再釘。minors/patches 照流。
+      #
+      # 2026-08-15 deliberate PR 已消化 TS 7 + vitest 4(見該 PR:TS7 的錯全是
+      # 「不再自動載 @types/*」造成,tsconfig 補 types:["node"] 後 dist 輸出與 TS5.7 逐檔相同)。
+      # 這幾條 ignore **不解除** —— 它擋的不是「這一版」而是「大版自動進來」這個模式。
+      # @types/node 尤其:它永遠該釘 engines 的下緣(現為 Node 22),不是釘最新。
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
       - dependency-name: vitest

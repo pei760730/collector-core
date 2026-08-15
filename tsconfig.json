@@ -4,6 +4,11 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
+    // 顯式指定,別回頭刪:TypeScript 7 不再自動把 node_modules/@types/* 灌進全域範圍,
+    // 少了這行 TS7 會對 URL / process / console / fetch / setTimeout 全噴 TS2304/TS2591
+    // (看起來像 code 壞掉,其實是全域型別沒載到)。TS 5.x 也吃這個設定、行為不變,
+    // 順帶把全域面收斂成「只有 node」——日後誤裝的 @types/* 不會靜默進到全域。
+    "types": ["node"],
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
