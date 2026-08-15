@@ -4,6 +4,7 @@
  * 由三個 collector 的 config.ts 逐字副本抽進 core,行為需一致。
  */
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { fileURLToPath } from "node:url";
 import {
   required,
   optional,
@@ -184,6 +185,16 @@ describe("loadGoogleCredentials:三來源優先序 + 驗證(純環境變數,不�
   it("只設 file 且路徑不存在 → readFileSync 丟錯(file 分支有被走到)", () => {
     process.env.GOOGLE_SERVICE_ACCOUNT_FILE = "/definitely/not/a/real/file.json";
     expect(() => loadGoogleCredentials()).toThrow();
+  });
+
+  it("file 來源以 UTF-8 讀取並解析憑證", () => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_FILE = fileURLToPath(
+      new URL("./fixtures/google-service-account.json", import.meta.url),
+    );
+    expect(loadGoogleCredentials()).toEqual({
+      client_email: "file@sa.test",
+      private_key: "-----KEY-----",
+    });
   });
 
   it("private_key 內字面 \\n 還原成真正換行(.env 單行貼法)", () => {

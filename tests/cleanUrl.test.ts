@@ -34,14 +34,22 @@ describe("cleanUrl", () => {
     expect(cleanUrl("https://m.youtube.com/watch?v=abcdefghijk").cleanUrl).toContain(
       "www.youtube.com",
     );
+    expect(cleanUrl("https://m.facebook.com/reel/123").cleanUrl).toContain(
+      "www.facebook.com",
+    );
   });
 
   it("補 https 前綴", () => {
     expect(cleanUrl("tiktok.com/@u/video/1").cleanUrl).toMatch(/^https:\/\//);
   });
 
+  it("非法網址不是短網址", () => {
+    expect(cleanUrl("https://%").isShortUrl).toBe(false);
+  });
+
   it("去尾斜線", () => {
     expect(cleanUrl("https://x.com/a/").cleanUrl).toBe("https://x.com/a");
+    expect(cleanUrl("https://x.com/a///").cleanUrl).toBe("https://x.com/a");
   });
 
   it("偵測短網址", () => {

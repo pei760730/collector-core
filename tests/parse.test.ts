@@ -89,6 +89,14 @@ describe("parseMessage", () => {
     expect(r.truncated).toBe(true);
   });
 
+  it("URL 2048 字元邊界不提早截成 2047", () => {
+    const prefix = "https://x.com/a?q=";
+    const exact = prefix + "a".repeat(2048 - prefix.length);
+    const r = parseMessage({ text: exact });
+    expect(r.rawUrl).toHaveLength(2048);
+    expect(r.truncated).toBe(false);
+  });
+
   it("超長備註 → 截斷並標記 truncated", () => {
     const r = parseMessage({ text: `https://youtu.be/abc ${"哈".repeat(3000)}` });
     expect(r.note.length).toBeLessThanOrEqual(2000);

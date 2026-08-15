@@ -120,6 +120,15 @@ describe("extractVideoId", () => {
     ).toBe("fb_55667788");
   });
 
+  it("Facebook 同時有 story_fbid 與 v 時以 story_fbid 為準", () => {
+    expect(
+      extractVideoId(
+        "Facebook",
+        "https://www.facebook.com/story.php?story_fbid=story123&v=video456",
+      ).videoId,
+    ).toBe("fb_story123");
+  });
+
   it("Facebook 純個人頁(四形態皆不中)→ unknown + unsupported", () => {
     const r = extractVideoId("Facebook", "https://www.facebook.com/someuser");
     expect(r.unsupported).toBe(true);

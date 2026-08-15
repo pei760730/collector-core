@@ -12,6 +12,7 @@ describe("isTransient 暫態判斷", () => {
   it("404 / 4xx 非暫態", () => {
     expect(isTransient({ code: 404 })).toBe(false);
     expect(isTransient({ response: { status: 400 } })).toBe(false);
+    expect(isTransient({ code: 600 })).toBe(false);
   });
 
   it("網路型 errno code / 訊息視為暫態(含 superset 的 ENOTFOUND / network)", () => {
@@ -146,6 +147,65 @@ describe("withRetry 退避重試", () => {
     // Retry-After: 30(秒)→ 精確等 30000ms,不加 jitter、不用退避預設。
     const delays = setTimeoutSpy.mock.calls.map((c) => c[1]);
     expect(delays).toContain(30000);
+  });
+
+  it("Retry-After 秒數夾在 60 秒上限，0 秒則立即重試", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const values = ["120", 0] as const;
+    for (const retryAfter of values) {
+      const fn = vi.fn(async () => {
+        throw { code: 429, retryAfter };
+      });
+      const p = withRetry("append", fn, { tries: 2 });
+      const assertion = expect(p).rejects.toMatchObject({ code: 429 });
+      await vi.runAllTimersAsync();
+      await assertion;
+    }
+    const delays = setTimeoutSpy.mock.calls.map((c) => c[1]);
+    expect(delays).toContain(60000);
+    expect(delays).toContain(0);
+  });
+
+  it("非法 Retry-After 不當秒數解析，HTTP-date 則精確遵守", async () => {
+    vi.setSystemTime(new Date("2026-08-15T00:00:00.000Z"));
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    for (const retryAfter of ["30x", "Sat, 15 Aug 2026 00:00:30 GMT"]) {
+      vi.setSystemTime(new Date("2026-08-15T00:00:00.000Z"));
+      const fn = vi.fn(async () => {
+        throw { code: 429, retryAfter };
+      });
+      const p = withRetry("append", fn, { tries: 2 });
+      const assertion = expect(p).rejects.toMatchObject({ code: 429 });
+      await vi.runAllTimersAsync();
+      await assertion;
+    }
+    const delays = setTimeoutSpy.mock.calls.map((c) => c[1]);
+    expect(delays[0]).toBeGreaterThanOrEqual(5000);
+    expect(delays).toContain(30000);
+  });
+
+  it("一般暫態採 500、1000ms 指數退避（固定 jitter=0）", async () => {
+    vi.spyOn(Math, "random").mockReturnValue(0);
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    const fn = vi.fn(async () => {
+      throw { code: 503 };
+    });
+    const p = withRetry("read", fn, { tries: 3 });
+    const assertion = expect(p).rejects.toMatchObject({ code: 503 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(setTimeoutSpy.mock.calls.map((c) => c[1])).toEqual([500, 1000]);
+  });
+
+  it("未指定 tries 時最多嘗試 4 次", async () => {
+    const fn = vi.fn(async () => {
+      throw { code: 503 };
+    });
+    const p = withRetry("read", fn);
+    const assertion = expect(p).rejects.toMatchObject({ code: 503 });
+    await vi.runAllTimersAsync();
+    await assertion;
+    expect(fn).toHaveBeenCalledTimes(4);
   });
 
   it("一般 5xx 暫態仍走 500ms 起跳的短退避(429 的秒級基準不外溢到非配額錯誤)", async () => {

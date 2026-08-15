@@ -30,6 +30,13 @@ describe("date utils（台北牆鐘）", () => {
     expect(ageInDays("", now)).toBe(Infinity);
   });
 
+  it("ageInDays 依曆日而非未滿 24 小時，午夜後仍算前一天為 1", () => {
+    const justAfterMidnight = dayjs.tz("2026-07-08 00:01", TZ).valueOf();
+    expect(ageInDays("2026-07-07", justAfterMidnight)).toBe(1);
+    const beforeNextMidnight = dayjs.tz("2026-07-08 23:59", TZ).valueOf();
+    expect(ageInDays("2026-07-09", beforeNextMidnight)).toBe(-1);
+  });
+
   it("溢位日期(dayjs 會靜默向前滾動)→ null,不接受滾動後結果", () => {
     // dayjs 把 2026/2/30 滾成 2026-03-02 且 isValid()=true;回寫比對才擋得住。
     expect(parseSheetDate("2026/2/30")).toBeNull();
