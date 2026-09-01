@@ -29,7 +29,7 @@
     "release": "node scripts/release.mjs"
   },
   "dependencies": {
-    "dayjs": "^1.11.13"
+    "dayjs": "^1.11.23"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
