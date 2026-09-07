@@ -183,6 +183,19 @@ describe("TRACKING_PARAMS 行為快照", () => {
     "s",
     "mibextid",
     "rdid",
+    // 2026-09-08:TikTok「複製連結」實際會附上的參數。舊清單只有 tt_from / s,
+    // 而那兩個都不是網頁版或 App 版複製連結真正帶的東西 —— 同一支影片因此清出三種
+    // 不同的 CLEAN_URL,of 引擎的回流閘門(拿 CLEAN_URL 對總表做精確字串比對)整個穿透。
+    "is_from_webapp",
+    "sender_device",
+    "web_id",
+    "_r",
+    "_t",
+    "share_app_id",
+    "share_link_id",
+    "share_item_id",
+    "u_code",
+    "refer",
   ];
 
   it("快照裡每個參數都被剝除(少剝一個 = 有人從 Set 刪了東西)", () => {
@@ -195,12 +208,48 @@ describe("TRACKING_PARAMS 行為快照", () => {
   it("非快照參數不被剝除(多剝 = 有人往 Set 加了東西沒更新快照)", () => {
     // 探測一批「像追蹤碼但不在清單」的名字,防止 Set 被悄悄擴張:
     // 擴張本身可能是對的,但必須同步更新本快照 + 想清楚 fleet dedup 影響。
-    for (const p of ["ref", "source", "from", "share_id", "si", "feature"]) {
+    // ⚠️ 名字相近但**刻意分開**的三組,別順手合併:
+    //   - `ref` 不砍 / `refer` 砍(只砍 TikTok 真的會附的那個確切名字)
+    //   - `share_id` 不砍 / `share_app_id`+`share_link_id`+`share_item_id` 砍
+    //   - `modal_id` 不砍:那是抖音的,可能攜帶影片身分,砍了會把不同影片誤合併
+    for (const p of ["ref", "source", "from", "share_id", "si", "feature", "modal_id"]) {
       const out = cleanUrl(`https://example.com/a?${p}=x&keep=1`).cleanUrl;
       expect(out, `param ${p} 不在快照,不該被剝`).toBe(
         `https://example.com/a?${p}=x&keep=1`,
       );
     }
+  });
+});
+
+// ── TikTok 分享參數:同一支影片必須清出同一個 CLEAN_URL ──────────────────────
+// voc/tbvoc 不受影響(groupKey 用 video id),但 **of 引擎的回流閘門是拿 CLEAN_URL 對
+// 總表做精確字串比對** —— 一支已經產製過的影片從不同裝置再分享一次,就會直接穿過閘門、
+// 重新收進暫存區,正是 TRACKING_PARAMS 那行註解說這個 Set 存在就是要擋的「重複回流」。
+describe("TikTok 複製連結:三種裝置同一個 CLEAN_URL", () => {
+  const CANON = "https://www.tiktok.com/@user/video/7234567890123456789";
+
+  it("網頁版 / App 版 / 分享面板的參數都清乾淨", () => {
+    const variants = [
+      CANON,
+      `${CANON}?is_from_webapp=1&sender_device=pc&web_id=7300000000000000000`,
+      `${CANON}?_r=1&_t=8qABCdEf`,
+      `${CANON}?share_app_id=1233&share_link_id=abc&share_item_id=999&u_code=xyz&refer=web`,
+      `${CANON}?tt_from=copy&s=h5`,
+    ];
+    for (const v of variants) {
+      expect(cleanUrl(v).cleanUrl, `分享形態未收斂:${v}`).toBe(CANON);
+    }
+    expect(new Set(variants.map((v) => cleanUrl(v).cleanUrl)).size).toBe(1);
+  });
+
+  it("web_id(TikTok 的裝置指紋)不得被寫進 CLEAN_URL 欄", () => {
+    const out = cleanUrl(`${CANON}?web_id=7300000000000000000`).cleanUrl;
+    expect(out).not.toContain("web_id");
+  });
+
+  it("控制組:抖音的 modal_id 保留(可能攜帶影片身分,砍了會誤合併不同影片)", () => {
+    const out = cleanUrl("https://www.douyin.com/discover?modal_id=7234567890123456789").cleanUrl;
+    expect(out).toContain("modal_id=7234567890123456789");
   });
 });
 
