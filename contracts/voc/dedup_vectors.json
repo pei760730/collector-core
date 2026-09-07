@@ -1,5 +1,5 @@
 {
-  "_note": "跨語言去重契約向量(canonical 在 pei760730/voc;本檔為 vendored 副本)。Python 側 voc(normalize.dedup_key)與 TeaBus-VOC(tbvoc cli._dedup_key)、TS 側 collector-core(pipeline.groupKey,經 collector 三 target 消費)都對這份共跑,保證『分群等價』(格式 : vs _ 允許不同)。voc 與 tbvoc 經 2026-06-27 對齊後分群完全一致,故共用同一份。改去重規則前先改這裡、各側測試會先紅。守門:voc/tbvoc tests/test_dedup_contract.py、core tests/dedupConformance.test.ts。(原 sv-bot/clip 各自 vendored 同名,已於 2026-07-15 #9 併入 collector archive。)",
+  "_note": "跨語言去重契約向量(canonical 就是本檔:pei760730/collector-core 的 contracts/voc/dedup_vectors.json,隨 npm 套件發布;voc 與 TeaBus-VOC 各持一份手動鏡像 + md5 守門 test_dedup_canonical_drift.py,因為 Python 側無法 import npm 套件)。改契約的方向是 core → voc/tbvoc:改本檔 → bump core tag → 覆蓋兩份鏡像 → 更新兩邊的 _CANONICAL_MD5 → 三側 conformance 各自先紅。Python 側 voc(normalize.dedup_key)與 TeaBus-VOC(tbvoc cli._dedup_key)、TS 側 collector-core(pipeline.groupKey,經 collector 三 target 消費)都對這份共跑,保證『分群等價』(格式 : vs _ 允許不同)。voc 與 tbvoc 經 2026-06-27 對齊後分群完全一致,故共用同一份。改去重規則前先改這裡、各側測試會先紅。守門:voc/tbvoc tests/test_dedup_contract.py、core tests/dedupConformance.test.ts。(原 sv-bot/clip 各自 vendored 同名,已於 2026-07-15 #9 併入 collector archive。)",
   "schemaVersion": "2",
   "same_group": [
     {
@@ -102,6 +102,14 @@
       "urls": [
         "https://fb.watch/1234567890",
         "https://www.facebook.com/videos/1234567890"
+      ]
+    },
+    {
+      "name": "facebook-粉專分頁關鍵字-不是影片id",
+      "why": "?v=timeline / info / wall / app_<n> 是舊版粉專與社團的分頁網址,不是影片 id。query id 只驗參數名不驗值時,不同粉專會塌成同一把 fb_timeline 鍵 —— 參考池全表比對又無時間窗,第一筆之後全部被永久判定重複、靜默丟棄。合法值:v 純數字、story_fbid 純數字或 pfbid…(2026-09-08 兩語同步)",
+      "urls": [
+        "https://www.facebook.com/PageAlpha/?v=timeline",
+        "https://www.facebook.com/PageBeta/?v=timeline"
       ]
     }
   ],
