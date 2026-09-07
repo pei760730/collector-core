@@ -51,3 +51,22 @@ describe("groupKey 分群", () => {
     expect(groupKey("  https://example.com/a?utm=1  ")).toBe("https://example.com/a");
   });
 });
+
+// 去重鍵層的後果:extractVideoId 對 FB query id 不驗值時,不同粉專會塌成同一把鍵。
+// 參考池是全表比對、無時間窗 —— 第一筆收進去之後所有後來的都被永久判定重複、靜默丟棄。
+describe("groupKey:Facebook 粉專分頁不得塌成同一把去重鍵", () => {
+  for (const tab of ["timeline", "info", "wall", "app_2405167945"]) {
+    it(`不同粉專共用 ?v=${tab} → 必須是兩把不同 key`, () => {
+      const a = groupKey(`https://www.facebook.com/PageAlpha/?v=${tab}`);
+      const b = groupKey(`https://www.facebook.com/PageBeta/?v=${tab}`);
+      expect(a, `?v=${tab} 兩個粉專算出同一把鍵 ${a}`).not.toBe(b);
+      expect(a.startsWith("http"), `?v=${tab} 應退路徑 key,實得 ${a}`).toBe(true);
+    });
+  }
+
+  it("控制組:合法數字 watch?v= 仍跨 host 收斂同一把 key", () => {
+    const k = groupKey("https://www.facebook.com/watch?v=1122334455");
+    expect(k).toBe("fb_1122334455");
+    expect(groupKey("https://fb.com/watch?v=1122334455")).toBe(k);
+  });
+});

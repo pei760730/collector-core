@@ -93,14 +93,52 @@ const SHORT_URL_HOSTS = new Set([
 ]);
 
 /**
- * Facebook 轉址解開:`l.facebook.com/l.php?u=<編碼真網址>` → 還原內層真網址。
- * 非 FB 轉址回 null。`searchParams.get` 已 percent-decode,直接用(不再 decodeURIComponent
- * 雙重解碼)。概念借自 feed-collector —— 從 FB app 分享 IG/TikTok/YT 等「本來就支援」的連結
- * 常被包成這種轉址,不解會落 fallback + unknown_ 垃圾列。
+ * 已知的「分享包裝」轉址 host(`?u=<編碼真網址>`)。SSoT 在此;
+ * tests/shareWrapper.test.ts 對這份清單逐個 host 參數化守門,並比對一份手抄鏡像 ——
+ * 增刪 host 必須同步改那裡,讓擴張/縮減是 PR diff 上看得見的決定。
+ *
+ * 2026-09-08 之前只認 `l.facebook.com` / `lm.facebook.com` 兩個 host,實測後果:
+ * `l.instagram.com` 的分享完全沒被拆,而它又因為 `endsWith(".instagram.com")` 命中
+ * Instagram 網域規則 → 平台被誤標成 Instagram(即使包的是 TikTok 影片);groupKey 退路徑
+ * fallback,而 fallback 會砍掉 query —— **身分 100% 就住在那段 query 裡**。於是每一則
+ * `l.instagram.com` 分享都得到同一把鍵 `https://l.instagram.com`,第一筆之後全部被當重複
+ * 靜默丟棄。Messenger 的 `l.messenger.com` 同病(且平台落 Unknown)。
  */
-function unwrapFacebookRedirect(url: URL): string | null {
+export const REDIRECT_WRAPPER_HOSTS = new Set([
+  "l.facebook.com",
+  "lm.facebook.com",
+  "l.instagram.com",
+  "lm.instagram.com",
+  "l.messenger.com",
+]);
+
+/**
+ * `/l.php?u=` 這個包裝形態在整個 facebook.com 網域都成立(`m.` / `www.` / 裸網域都有)。
+ * 用規則涵蓋而不是逐個 host 列舉:host 白名單漏一個就是整類分享互撞,而 `/l.php` 這條
+ * 路徑在 FB 網域上除了轉址沒有別的用途。
+ */
+function isFacebookLinkShim(host: string, pathname: string): boolean {
+  return pathname === "/l.php" && (host === "facebook.com" || host.endsWith(".facebook.com"));
+}
+
+/**
+ * 分享包裝轉址解開:`<wrapper>?u=<編碼真網址>` → 還原內層真網址。非包裝回 null。
+ * `searchParams.get` 已 percent-decode,直接用(不再 decodeURIComponent 雙重解碼)。
+ * 概念借自 feed-collector —— 從 FB / IG / Messenger 分享 IG/TikTok/YT 等「本來就支援」的
+ * 連結常被包成這種轉址,不解會落 fallback + unknown_ 垃圾列。
+ *
+ * `m.facebook.com/l.php` 的舊病是**順序**:host 白名單比對跑在 MOBILE_TO_DESKTOP 之前,
+ * m.facebook.com 對不上白名單,之後才被改寫成 www.facebook.com,最後落成一個沒有 id 的
+ * FB 連結、鍵是 `https://www.facebook.com/l.php`,所有 m.facebook 分享互撞(2026-09-08 實測)。
+ * 改成 `/l.php` **路徑規則**之後這個順序依賴就消失了 —— 規則對 m./www./裸網域一律成立,
+ * 改寫前後都拆得到(2026-09-08 突變實測:把本呼叫移到 MOBILE_TO_DESKTOP 之後,全套仍全綠)。
+ * 擺在前面是語意選擇(包裝根本不是內容 URL,先拆比較誠實),**不是**正確性依賴。
+ * 遞迴安全:內層是外層 query 的 percent-decode 子字串、長度嚴格變短 → 巢狀包裝逐層拆到底、
+ * 不會無限遞迴。
+ */
+function unwrapShareRedirect(url: URL): string | null {
   const host = url.hostname.toLowerCase();
-  if (host !== "l.facebook.com" && host !== "lm.facebook.com") return null;
+  if (!REDIRECT_WRAPPER_HOSTS.has(host) && !isFacebookLinkShim(host, url.pathname)) return null;
   const inner = url.searchParams.get("u");
   // u= 存在但空(present-but-empty)時 .get 回 ""(非 null),外層遞迴 cleanUrl("") → "https:" 垃圾列。
   // 空/純空白 → 當作非轉址,讓外層照原 URL 正常處理。
@@ -139,11 +177,12 @@ export function cleanUrl(input: string): CleanedUrl {
     return { cleanUrl: stringCleanup(raw), isShortUrl };
   }
 
-  // Facebook 轉址解開:還原成內層真網址後,重走完整清理(去追蹤參數/行動版/偵測短網址)。
-  // 內層 host 不會再是 l.facebook → 不會無限遞迴;isShortUrl 改以內層判定(內層可能是 vm.tiktok)。
-  const fbInner = unwrapFacebookRedirect(url);
-  if (fbInner != null) {
-    return cleanUrl(fbInner);
+  // 分享包裝轉址解開:還原成內層真網址後,重走完整清理(去追蹤參數/行動版/偵測短網址)。
+  // 必須在 MOBILE_TO_DESKTOP 之前(m.facebook.com/l.php);isShortUrl 改以內層判定
+  // (內層可能是 vm.tiktok)。巢狀包裝逐層拆:每層內層長度嚴格變短,遞迴必然收斂。
+  const inner = unwrapShareRedirect(url);
+  if (inner != null) {
+    return cleanUrl(inner);
   }
 
   // 行動版轉桌面版

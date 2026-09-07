@@ -68,9 +68,35 @@ function youtubeQueryId(params: URLSearchParams | null): string | null {
  *   A. fb.watch/<code>            → fbw_   (host+pathname)
  *   B. /(reel|reels|videos)/<n>   → fb_    (host+pathname)
  *   C. /share/[rvp]/<code>        → fbs_   (host+pathname)
- *   D. query story_fbid 或 v      → fb_    (query 白名單)
+ *   D. query story_fbid 或 v      → fb_    (query 白名單,**且驗值**)
  * 四種都不中(如純個人頁 / 社團)→ 回 null,退 unknown_ + 連結路徑去重。
  */
+/**
+ * Facebook 的 query id 必須驗「值」,不是只驗「名」。
+ *   - `watch?v=<純數字>`            → 合法影片 id
+ *   - `story_fbid=<純數字|pfbid…>`  → 合法貼文 id
+ *
+ * 不驗值的話,舊版粉專 / 社團的分頁網址(`?v=timeline` / `info` / `wall` / `app_<n>`)會產出
+ * 一個自信的、非 unsupported 的 `fb_<分頁名>` id。groupKey 拿它當去重鍵 → 每一個不同粉專
+ * 只要帶同一個分頁關鍵字就塌成同一把鍵(`fb_timeline`);參考池是全表比對又無時間窗,
+ * 第一筆收進去之後,所有後來的都被永久判定為重複、靜默丟棄(2026-09-08 實測)。
+ * 這裡補的就是 20 行外 YouTube 分支早就有的做法(youtubeQueryId gates on YOUTUBE_V_ID)。
+ */
+const FB_V_ID = /^\d+$/;
+const FB_STORY_ID = /^(?:\d+|pfbid[A-Za-z0-9]+)$/;
+
+/**
+ * 依序試 `story_fbid` → `v`,**各自驗值**;都不合法回 null(退 unknown_ + 連結路徑去重)。
+ * story_fbid 仍優先於 v(同時存在時以 story_fbid 為準),但它不合法時退用合法的 v ——
+ * 比整組放棄多留一個正確的去重鍵,且 v 已驗過純數字、不會反過來製造碰撞。
+ */
+function facebookQueryId(params: URLSearchParams | null): string | null {
+  const story = params?.get("story_fbid") ?? "";
+  if (FB_STORY_ID.test(story)) return story;
+  const v = params?.get("v") ?? "";
+  return FB_V_ID.test(v) ? v : null;
+}
+
 function extractFacebook(pathPart: string, params: URLSearchParams | null): string | null {
   const fbw = pathPart.match(/fb\.watch\/([A-Za-z0-9_-]+)/);
   if (fbw) return `fbw_${fbw[1]}`;
@@ -78,7 +104,7 @@ function extractFacebook(pathPart: string, params: URLSearchParams | null): stri
   if (vids) return `fb_${vids[1]}`;
   const share = pathPart.match(/\/share\/[rvp]\/([A-Za-z0-9_-]+)/);
   if (share) return `fbs_${share[1]}`;
-  const story = params?.get("story_fbid") ?? params?.get("v");
+  const story = facebookQueryId(params);
   if (story) return `fb_${story}`;
   return null;
 }
