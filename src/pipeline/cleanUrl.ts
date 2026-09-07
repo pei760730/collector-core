@@ -36,6 +36,28 @@ const TRACKING_PARAMS = new Set([
   "s",
   "mibextid",
   "rdid",
+  // 2026-09-08:TikTok「複製連結」實際會附上的參數。上面那兩個(tt_from / s)都不是
+  // 網頁版或 App 版複製連結真正帶的東西 —— 同一支影片因此清出三種不同的 CLEAN_URL:
+  //   網頁版:?is_from_webapp=1&sender_device=pc&web_id=<裝置指紋>
+  //   App 版:?_r=1&_t=<token>
+  //   分享面板:?share_app_id / share_link_id / share_item_id / u_code / refer
+  // voc/tbvoc 不受影響(groupKey 用 video id),但 of 引擎的回流閘門是拿 CLEAN_URL 對
+  // 總表做**精確字串比對**:一支已經產製過的影片換個裝置再分享一次就直接穿過閘門、
+  // 重新收進暫存區 —— 正是本 Set 存在要擋的「重複回流」。web_id 還是 TikTok 的裝置
+  // 指紋,原本會原封不動被寫進表的 CLEAN_URL 欄。
+  // ⚠️ 刻意**不**收抖音的 modal_id:那個可能攜帶影片身分,砍了會把不同影片誤合併。
+  // ⚠️ 只收 TikTok 真的會附的確切名字:`refer` 收、`ref` 不收;`share_*_id` 收、
+  //    `share_id` 不收(兩者都由 tests/cleanUrl.test.ts 的負向探針釘住)。
+  "is_from_webapp",
+  "sender_device",
+  "web_id",
+  "_r",
+  "_t",
+  "share_app_id",
+  "share_link_id",
+  "share_item_id",
+  "u_code",
+  "refer",
 ]);
 
 /** 行動版 → 桌面版 host 對照。 */
