@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { parseMessage, NoUrlError } from "../src/pipeline/parse.js";
+import { parseMessage, NoUrlError, tidyUrl } from "../src/pipeline/parse.js";
+// 尾端標點的代價落在「存下的連結」與「去重鍵」上,所以那組斷言直接跑完整條管線。
+import { cleanUrl } from "../src/pipeline/cleanUrl.js";
+import { groupKey } from "../src/pipeline/groupKey.js";
 
 describe("parseMessage", () => {
   it("抽出網址與備註", () => {
@@ -119,5 +122,56 @@ describe("parseMessage", () => {
     const r = parseMessage({ text: `https://youtu.be/abc ${"哈".repeat(2500)}` });
     expect(r.note.length).toBe(2000);
     expect(r.truncated).toBe(true);
+  });
+});
+
+// ── tidyUrl 尾端標點的左右對稱 ────────────────────────────────────────────────
+// TRAILING_PUNCT 原本列了右括號家族卻漏了左括號,而 NON_URL_CHAR 又把 ( [ ~ * + 當成
+// 合法 URL 字元、不在那裡截斷 —— 於是 `<url>(說明` 這種訊息會產出一個**結尾帶 `(` 的
+// rawUrl**,且原封不動通過 cleanUrl。兩個後果:
+//   1. 「連結」欄是參考池的整個交付物(人要點的那個連結),而它被存成點下去 404 的壞值。
+//   2. 對抽不出 id 的平台,groupKey 的 path fallback 會保留那個雜字元 → 同一個連結
+//      黏括號一次、沒黏一次 = 兩把不同的鍵 = 兩列。
+// 這裡釘的不變式是**對稱性**(不是某個字元):支援清單裡沒有任何真實平台網址會以這些
+// 字元結尾,黏上就是訊息裡的標點。
+describe("tidyUrl:尾端標點左右對稱", () => {
+  const BASE = "https://youtu.be/dQw4w9WgXcQ";
+
+  for (const [left, right] of [
+    ["(", ")"],
+    ["[", "]"],
+    ["{", "}"],
+    ["<", ">"],
+  ]) {
+    it(`「${left}」與「${right}」黏在尾端都要剝掉`, () => {
+      expect(tidyUrl(BASE + left), `左半邊「${left}」沒被剝`).toBe(BASE);
+      expect(tidyUrl(BASE + right), `右半邊「${right}」沒被剝`).toBe(BASE);
+    });
+  }
+
+  it("其它會被 NON_URL_CHAR 放行的尾端雜字元(~ * +)也要剝", () => {
+    for (const ch of ["~", "*", "+"]) {
+      expect(tidyUrl(BASE + ch), `尾端「${ch}」沒被剝`).toBe(BASE);
+    }
+  });
+
+  it("控制組:只剝尾端 —— URL 內部的同款字元不准動", () => {
+    expect(tidyUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ")).toBe(
+      "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    );
+    expect(tidyUrl("https://example.com/a(b)c/d")).toBe("https://example.com/a(b)c/d");
+    expect(tidyUrl("https://example.com/a+b~c*d/e")).toBe("https://example.com/a+b~c*d/e");
+  });
+
+  it("端到端:連結被左括號黏住 → 存下的連結點得開、備註不留殘餘", () => {
+    const r = parseMessage({ text: "https://youtu.be/dQw4w9WgXcQ(超好笑)" });
+    expect(r.rawUrl).toBe(BASE);
+    expect(r.note).toBe("超好笑");
+  });
+
+  it("端到端:黏括號與沒黏括號必須算出同一把去重鍵(否則同一個連結變兩列)", () => {
+    const sticky = parseMessage({ text: "https://www.facebook.com/CafeAlpha(超好吃" }).rawUrl;
+    const plain = parseMessage({ text: "https://www.facebook.com/CafeAlpha 超好吃" }).rawUrl;
+    expect(groupKey(cleanUrl(sticky).cleanUrl)).toBe(groupKey(cleanUrl(plain).cleanUrl));
   });
 });
