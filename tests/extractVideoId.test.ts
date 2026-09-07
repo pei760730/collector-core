@@ -121,12 +121,15 @@ describe("extractVideoId", () => {
   });
 
   it("Facebook 同時有 story_fbid 與 v 時以 story_fbid 為準", () => {
+    // 2026-09-08:原 fixture 用 story_fbid=story123 / v=video456,兩者都不是真實形態的 FB id。
+    // query id 改成驗值之後那組值會整組落 unsupported —— 換成真實形態,這條測試釘的
+    // 「優先序」本意不變(值的合法性由下面「必須驗值」那組守)。
     expect(
       extractVideoId(
         "Facebook",
-        "https://www.facebook.com/story.php?story_fbid=story123&v=video456",
+        "https://www.facebook.com/story.php?story_fbid=122100493388920531&v=1122334455",
       ).videoId,
-    ).toBe("fb_story123");
+    ).toBe("fb_122100493388920531");
   });
 
   it("Facebook 純個人頁(四形態皆不中)→ unknown + unsupported", () => {
@@ -200,5 +203,59 @@ describe("extractVideoId", () => {
     const r = extractVideoId("TikTok", "https://www.tiktok.com/discover/funny?lang=en");
     expect(r.unsupported).toBe(true);
     expect(r.videoId).toBe("");
+  });
+});
+
+// ── Facebook query id 的「值」驗證 ─────────────────────────────────────────────
+// 只驗參數「名」不驗「值」的話,粉專分頁網址(?v=timeline / info / wall / app_<n>)會產出
+// 一個自信的、非 unsupported 的 `fb_<分頁名>` id。groupKey 拿它當去重鍵 → 每一個不同粉專
+// 只要帶同一個分頁關鍵字就塌成同一把鍵,第一筆之後全部被永久判定重複、靜默丟棄。
+// YouTube 分支一直有做值驗證(youtubeQueryId gates on YOUTUBE_V_ID),FB 分支只是漏了。
+describe("Facebook query id 必須驗值,不是只驗參數名", () => {
+  // 舊版粉專 / 社團的分頁網址關鍵字(?v=<tab>),不是影片 id。
+  const PAGE_TABS = ["timeline", "info", "wall", "photos", "app_2405167945", "page_internal"];
+
+  it("?v=<粉專分頁關鍵字> 不得產出 id(退 unsupported → 走連結路徑 key)", () => {
+    for (const tab of PAGE_TABS) {
+      const r = extractVideoId("Facebook", `https://www.facebook.com/PageAlpha/?v=${tab}`);
+      expect(r.unsupported, `?v=${tab} 不該被當成影片 id`).toBe(true);
+      expect(r.videoId).toBe("");
+    }
+  });
+
+  it("控制組:?v=<純數字> 仍照抽(別把合法的 watch?v= 一起擋掉)", () => {
+    expect(extractVideoId("Facebook", "https://www.facebook.com/watch?v=1122334455").videoId).toBe(
+      "fb_1122334455",
+    );
+  });
+
+  it("story_fbid 只認純數字或 pfbid…", () => {
+    expect(
+      extractVideoId(
+        "Facebook",
+        "https://www.facebook.com/story.php?story_fbid=122100493388920531&id=61558439087436",
+      ).videoId,
+    ).toBe("fb_122100493388920531");
+    expect(
+      extractVideoId(
+        "Facebook",
+        "https://www.facebook.com/story.php?story_fbid=pfbid0abcXYZ789&id=61558439087436",
+      ).videoId,
+    ).toBe("fb_pfbid0abcXYZ789");
+    expect(
+      extractVideoId(
+        "Facebook",
+        "https://www.facebook.com/story.php?story_fbid=timeline&id=61558439087436",
+      ).unsupported,
+    ).toBe(true);
+  });
+
+  it("story_fbid 不合法但 v 合法 → 退用 v(不是整組放棄)", () => {
+    expect(
+      extractVideoId(
+        "Facebook",
+        "https://www.facebook.com/story.php?story_fbid=timeline&v=1122334455",
+      ).videoId,
+    ).toBe("fb_1122334455");
   });
 });
