@@ -63,8 +63,39 @@ jobs:
           if [ "$LATEST" = "$CUR" ]; then echo "已是最新,no-op"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           HI=$(printf '%s\n%s\n' "$CUR" "$LATEST" | sort -V | tail -1)
           if [ "$HI" != "$LATEST" ]; then echo "::warning::目前 v$CUR 比最新 tag v$LATEST 新,異常,跳過"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0; fi
-          if [ -n "$(gh pr list --repo "$GITHUB_REPOSITORY" --head "bump-core-v$LATEST" --state open --json number --jq '.[].number')" ]; then
-            echo "bump PR 已存在,跳過"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
+          # 上次可能已開 PR、卻在 dispatch CI 時失敗。只補目前 head 尚無的 CI;
+          # queued/running/completed 都算已有,失敗的 CI 留給人工判讀,不每日重打。
+          # 查詢失敗直接讓此 step 失敗,不能把「查不到」當成「沒有」。
+          EXISTING=$(LATEST="$LATEST" node <<'NODE'
+          const { execFileSync } = require("node:child_process");
+          const gh = (args) => execFileSync("gh", args, { encoding: "utf8" }).trim();
+          const repo = process.env.GITHUB_REPOSITORY;
+          const branch = `bump-core-v${process.env.LATEST}`;
+          const prs = JSON.parse(gh([
+            "pr", "list", "--repo", repo, "--head", branch, "--state", "open",
+            "--json", "number,headRefOid",
+          ]));
+          if (prs.length === 0) {
+            process.stdout.write("false");
+          } else {
+            const pr = prs[0];
+            if (!/^[0-9a-f]{40}$/.test(pr.headRefOid)) throw new Error("Missing PR head SHA");
+            const runs = JSON.parse(gh([
+              "run", "list", "--repo", repo, "--workflow", "ci.yml", "--branch", branch,
+              "--commit", pr.headRefOid, "--limit", "1", "--json", "databaseId",
+            ]));
+            if (runs.length === 0) {
+              gh(["workflow", "run", "ci.yml", "--repo", repo, "--ref", branch]);
+              console.error(`bump PR #${pr.number}: 已補 dispatch CI(head ${pr.headRefOid})`);
+            } else {
+              console.error(`bump PR #${pr.number}: head ${pr.headRefOid} 已有 CI,不重複 dispatch`);
+            }
+            process.stdout.write("true");
+          }
+          NODE
+          )
+          if [ "$EXISTING" = "true" ]; then
+            echo "bump PR 已存在,CI 已確認或補觸發"; echo "skip=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
           { echo "skip=false"; echo "cur=$CUR"; echo "latest=$LATEST"; echo "sha=$SHA"; } >> "$GITHUB_OUTPUT"
 
