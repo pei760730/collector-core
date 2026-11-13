@@ -42,8 +42,9 @@ const XHS_PATTERNS = [/\/explore\/([a-f0-9]+)/i, /\/discovery\/item\/([a-f0-9]+)
 const THREADS_PATTERNS = [/\/post\/([a-zA-Z0-9_-]+)/];
 // X(Twitter)推文 id(port 自 yt-dlp TwitterIE):/status/<數字>。涵蓋 /user/status/、i/web/status/。
 const X_PATTERNS = [/\/status\/(\d+)/];
-// 抖音(Douyin = TikTok 中國版;port 自 yt-dlp DouyinIE):只認 path /video/<id>
-// (裸 19 碼 2026-06-27 砍除,同 TikTok)。短連結 v.douyin.com 需展開,非此處負責。
+// 抖音(Douyin = TikTok 中國版;port 自 yt-dlp DouyinIE):path /video/<id> 優先
+// (裸 19 碼 2026-06-27 砍除,同 TikTok);path 沒命中才看 query 白名單 modal_id(見 douyinModalId)。
+// 短連結 v.douyin.com 需展開,非此處負責。
 const DOUYIN_PATTERNS = [/\/video\/(\d+)/];
 
 /** 把乾淨網址拆成 host+pathname(去 query/fragment)與 searchParams。非合法 URL → 字串退路。 */
@@ -60,6 +61,25 @@ function splitUrl(url: string): { pathPart: string; params: URLSearchParams | nu
 function youtubeQueryId(params: URLSearchParams | null): string | null {
   const v = params?.get("v") ?? "";
   return YOUTUBE_V_ID.test(v) ? v : null;
+}
+
+/**
+ * 抖音網頁版的 modal_id 走 query 白名單(collector-core #65)。
+ *
+ * 網址列複製出來的抖音連結長 `https://www.douyin.com/?modal_id=<影片id>`(`/discover`、`/jingxuan`
+ * 同形),影片身分只在 query。cleanUrl 刻意保留 modal_id,但這裡以前只認 path → 抽不到 id →
+ * groupKey 退路徑、砍掉 query → **每一支 modal 連結都塌成 `https://www.douyin.com`**,
+ * 第二支不同的影片被回「已收過」、靜默丟棄。
+ *
+ * 規則(三語一致,向量在 contracts/voc/dedup_vectors.json):
+ *   - 只認 top-level、大小寫敏感的 `modal_id`;重複時取**第一個非空值**,只驗那一個
+ *     (不合法就放棄、不往後找 —— 對齊 Python parse_qs 丟空值後取 [0])。
+ *   - 整個值必須是純 ASCII 數字 0-9:不截取、不 trim、不轉數字(保留前導零)、不收全形數字。
+ *     用「沒有任何非 0-9 字元」判定而不是錨點 regex,免得結尾換行之類被錨點放行。
+ */
+function douyinModalId(params: URLSearchParams | null): string | null {
+  const v = params?.getAll("modal_id").find((x) => x !== "") ?? "";
+  return v !== "" && !/[^0-9]/.test(v) ? v : null;
 }
 
 /**
@@ -148,7 +168,7 @@ export function extractVideoId(platform: Platform, cleanUrl: string): VideoIdInf
       break;
     case "抖音":
       prefix = "douyin";
-      raw = firstMatch(pathPart, DOUYIN_PATTERNS);
+      raw = firstMatch(pathPart, DOUYIN_PATTERNS) ?? douyinModalId(params);
       break;
     // 其餘(Unknown 等):無抽取規則 → 視為不支援,去重退連結路徑 key
     default:

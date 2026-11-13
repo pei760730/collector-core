@@ -78,6 +78,51 @@
         "https://www.instagram.com/reel/DGabcXYZ123",
         "https://www.instagram.com/reels/DGabcXYZ123"
       ]
+    },
+    {
+      "name": "douyin-modal-id-同片四形態",
+      "why": "網頁網址列複製的抖音連結把影片 id 放在 query 的 modal_id(/、/discover、/jingxuan 都有),與 /video/<id> 是同一支片 → 收斂同 key。修前 modal 形態抽不到 id、砍 query 後全塌成 https://www.douyin.com,不同影片被判成已收過(2026-11-13 三語同步,collector-core #65)",
+      "urls": [
+        "https://www.douyin.com/video/7234567890123456789",
+        "https://www.douyin.com/?modal_id=7234567890123456789",
+        "https://www.douyin.com/discover?modal_id=7234567890123456789",
+        "https://www.douyin.com/jingxuan?modal_id=7234567890123456789",
+        "https://www.douyin.com/discover?recommend=1&modal_id=7234567890123456789#ignored"
+      ]
+    },
+    {
+      "name": "douyin-path-id-優先於modal-id",
+      "why": "path 的 /video/<id> 優先;path 已命中就不看 modal_id(不論它是別支片的 id 還是不合法值)",
+      "urls": [
+        "https://www.douyin.com/video/7234567890123456789",
+        "https://www.douyin.com/video/7234567890123456789?modal_id=7234567890123456790",
+        "https://www.douyin.com/video/7234567890123456789?modal_id=invalid"
+      ]
+    },
+    {
+      "name": "douyin-modal-id-重複參數取首個非空值",
+      "why": "modal_id 重複出現時取第一個非空值(對齊 Python parse_qs 丟空值的行為),兩語一致",
+      "urls": [
+        "https://www.douyin.com/video/7234567890123456789",
+        "https://www.douyin.com/?modal_id=7234567890123456789&modal_id=7234567890123456790",
+        "https://www.douyin.com/?modal_id=&modal_id=7234567890123456789"
+      ]
+    },
+    {
+      "name": "douyin-modal-id-保留前導零",
+      "why": "id 當字串處理:不轉數字、不去前導零、不限長度",
+      "urls": [
+        "https://www.douyin.com/video/00123",
+        "https://www.douyin.com/?modal_id=00123"
+      ]
+    },
+    {
+      "name": "douyin-modal-id-percent解碼",
+      "why": "query 值先 percent 解碼再驗(%31%32%33 = 123)",
+      "urls": [
+        "https://www.douyin.com/video/123",
+        "https://www.douyin.com/?modal_id=%31%32%33"
+      ]
     }
   ],
   "distinct": [
@@ -110,6 +155,38 @@
       "urls": [
         "https://www.facebook.com/PageAlpha/?v=timeline",
         "https://www.facebook.com/PageBeta/?v=timeline"
+      ]
+    },
+    {
+      "name": "douyin-modal-id-不同片不撞-root",
+      "why": "同一路徑(/)上不同 modal_id 是不同影片,不得同 key —— 這就是 #65 的事故形態(第二支片被回『已收過』)",
+      "urls": [
+        "https://www.douyin.com/?modal_id=7234567890123456789",
+        "https://www.douyin.com/?modal_id=7234567890123456790"
+      ]
+    },
+    {
+      "name": "douyin-modal-id-不同片不撞-discover",
+      "why": "同一路徑(/discover)上不同 modal_id 是不同影片,不得同 key —— 這就是 #65 的事故形態(第二支片被回『已收過』)",
+      "urls": [
+        "https://www.douyin.com/discover?modal_id=7234567890123456789",
+        "https://www.douyin.com/discover?modal_id=7234567890123456790"
+      ]
+    },
+    {
+      "name": "douyin-modal-id-不同片不撞-jingxuan",
+      "why": "同一路徑(/jingxuan)上不同 modal_id 是不同影片,不得同 key —— 這就是 #65 的事故形態(第二支片被回『已收過』)",
+      "urls": [
+        "https://www.douyin.com/jingxuan?modal_id=7234567890123456789",
+        "https://www.douyin.com/jingxuan?modal_id=7234567890123456790"
+      ]
+    },
+    {
+      "name": "douyin-modal-id-跨平台不撞",
+      "why": "抖音 modal_id 與 TikTok /video/ 同數字 id 各帶平台命名空間,不互撞",
+      "urls": [
+        "https://www.douyin.com/?modal_id=7234567890123456789",
+        "https://www.tiktok.com/@user/video/7234567890123456789"
       ]
     }
   ],
@@ -166,6 +243,114 @@
       "name": "tiktok-item_id-不抽-退路徑",
       "why": "Task2 決策:TikTok item_id= 是 query 形態(可注入),voc/feed 本就沒有,故 2026-06-27 從 core/tbvoc 砍除、四語對齊到只認 path /video/<id> → item_id query 退路徑",
       "url": "https://www.tiktok.com/@u?item_id=12345",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-root-抽id",
+      "why": "合法 modal_id(純 ASCII 數字)→ 抽成 id key",
+      "url": "https://www.douyin.com/?modal_id=7234567890123456789",
+      "expect": "id"
+    },
+    {
+      "name": "douyin-modal-id-discover-抽id",
+      "why": "合法 modal_id(純 ASCII 數字)→ 抽成 id key",
+      "url": "https://www.douyin.com/discover?modal_id=7234567890123456789",
+      "expect": "id"
+    },
+    {
+      "name": "douyin-modal-id-jingxuan-抽id",
+      "why": "合法 modal_id(純 ASCII 數字)→ 抽成 id key",
+      "url": "https://www.douyin.com/jingxuan?modal_id=7234567890123456789",
+      "expect": "id"
+    },
+    {
+      "name": "douyin-modal-id-不合法值-空值-退路徑",
+      "why": "空值不是 id → 退路徑",
+      "url": "https://www.douyin.com/?modal_id=",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-不合法值-數字後帶字母-退路徑",
+      "why": "整個值必須是純 ASCII 數字,不截取前綴 → 退路徑",
+      "url": "https://www.douyin.com/?modal_id=123abc",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-不合法值-字母後帶數字-退路徑",
+      "why": "整個值必須是純 ASCII 數字,不截取後綴 → 退路徑",
+      "url": "https://www.douyin.com/?modal_id=abc123",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-不合法值-正號-退路徑",
+      "why": "帶正負號不是 id → 退路徑",
+      "url": "https://www.douyin.com/?modal_id=%2B123",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-不合法值-負號-退路徑",
+      "why": "帶正負號不是 id → 退路徑",
+      "url": "https://www.douyin.com/?modal_id=-123",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-不合法值-前導空白-退路徑",
+      "why": "含空白不是 id(不 trim) → 退路徑",
+      "url": "https://www.douyin.com/?modal_id=%20123",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-不合法值-結尾換行-退路徑",
+      "why": "解碼後結尾換行不得被 regex 的 $ 放行(Python 用 fullmatch、TS 驗整個值) → 退路徑",
+      "url": "https://www.douyin.com/?modal_id=123%0A",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-不合法值-全形數字-退路徑",
+      "why": "Unicode 數字(全形 123)不是 id:只收 ASCII 0-9(Python 不用 \\d / isdigit) → 退路徑",
+      "url": "https://www.douyin.com/?modal_id=%EF%BC%91%EF%BC%92%EF%BC%93",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-首個非空值不合法-退路徑",
+      "why": "重複參數只驗第一個非空值;它不合法就退路徑,不往後找(兩語一致)",
+      "url": "https://www.douyin.com/?modal_id=invalid&modal_id=7234567890123456789",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-query注入video路徑-退路徑",
+      "why": "?redirect=/video/<id> 是 query 注入,path 型 pattern 只比 host+pathname → 退路徑",
+      "url": "https://www.douyin.com/?redirect=/video/7234567890123456789",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-query值內嵌modal_id-退路徑",
+      "why": "別的參數值裡夾帶 modal_id=<id> 不算:只認 top-level 的 modal_id 參數 → 退路徑",
+      "url": "https://www.douyin.com/?redirect=modal_id%3D7234567890123456789",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-fragment內modal_id-退路徑",
+      "why": "fragment 不是 query,不抽 → 退路徑",
+      "url": "https://www.douyin.com/#modal_id=7234567890123456789",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal_id大寫參數名-退路徑",
+      "why": "參數名大小寫敏感:MODAL_ID 不是 modal_id → 退路徑",
+      "url": "https://www.douyin.com/?MODAL_ID=7234567890123456789",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-modal-id-假冒host-退路徑",
+      "why": "douyin.com.evil.example 不是抖音網域,不得因 modal_id 抽出抖音 id → 退路徑",
+      "url": "https://douyin.com.evil.example/?modal_id=7234567890123456789",
+      "expect": "path"
+    },
+    {
+      "name": "douyin-短連結未展開-退路徑",
+      "why": "v.douyin.com 短連結沒展開時沒有影片 id(抽取不做 I/O),退路徑;展開是 collector 端的事,失敗或關閉時不保證與長連結同群",
+      "url": "https://v.douyin.com/ABC/",
       "expect": "path"
     }
   ]
