@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { cleanUrl } from "../src/pipeline/cleanUrl.js";
 import { groupKey } from "../src/pipeline/groupKey.js";
 
 describe("groupKey 分群", () => {
@@ -14,6 +15,21 @@ describe("groupKey 分群", () => {
     const tt = groupKey("https://www.tiktok.com/@u/video/7234567890123456789");
     const dy = groupKey("https://www.douyin.com/video/7234567890123456789");
     expect(tt).not.toBe(dy);
+  });
+
+  // collector-core #65 的事故形態:collector 實際路徑是 groupKey(cleanUrl(原始連結).cleanUrl)。
+  it("抖音 modal_id:不同影片不再塌成同一把 key、同片與 /video/<id> 收斂(走 cleanUrl 後的真實路徑)", () => {
+    const viaClean = (u: string): string => groupKey(cleanUrl(u).cleanUrl);
+    const a = viaClean("https://www.douyin.com/?modal_id=7234567890123456789");
+    const b = viaClean("https://www.douyin.com/?modal_id=7234567890123456790");
+    expect(a).toBe("douyin_7234567890123456789");
+    expect(b).toBe("douyin_7234567890123456790");
+    expect(viaClean("https://www.douyin.com/jingxuan?modal_id=7234567890123456789&from=share")).toBe(a);
+    expect(viaClean("https://www.douyin.com/video/7234567890123456789")).toBe(a);
+    // 假冒網域不是抖音:不得抽出抖音 id
+    expect(groupKey("https://douyin.com.evil.example/?modal_id=7234567890123456789")).toBe(
+      "https://douyin.com.evil.example",
+    );
   });
 
   it("IG /tv/(IGTV)抽得到 id(canonical 補 tv,對齊引擎)", () => {

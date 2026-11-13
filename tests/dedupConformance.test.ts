@@ -38,9 +38,10 @@ describe("voc 去重契約:向量集完整性(防截斷 re-vendor 靜默弱化)"
     expect(vectors.schemaVersion).toBe("2");
   });
   it("各向量數不得低於目前基線", () => {
-    expect(vectors.same_group.length).toBeGreaterThanOrEqual(7);
-    expect(vectors.distinct.length).toBeGreaterThanOrEqual(3);
-    expect(vectors.edge_cases.length).toBeGreaterThanOrEqual(9);
+    // 2026-11-13 抖音 modal_id 向量進來後的基線(#65);鏡像被截回舊版會在這裡紅。
+    expect(vectors.same_group.length).toBeGreaterThanOrEqual(14);
+    expect(vectors.distinct.length).toBeGreaterThanOrEqual(8);
+    expect(vectors.edge_cases.length).toBeGreaterThanOrEqual(27);
   });
 });
 

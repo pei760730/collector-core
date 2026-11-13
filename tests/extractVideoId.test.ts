@@ -171,6 +171,52 @@ describe("extractVideoId", () => {
     expect(r.videoId).toBe("");
   });
 
+  // collector-core #65:網頁網址列複製的抖音連結,影片 id 在 query 的 modal_id。
+  it.each([
+    ["https://www.douyin.com/?modal_id=7234567890123456789", "douyin_7234567890123456789"],
+    ["https://www.douyin.com/discover?modal_id=7234567890123456789", "douyin_7234567890123456789"],
+    ["https://www.douyin.com/jingxuan?modal_id=7234567890123456789", "douyin_7234567890123456789"],
+    // 重複參數:取第一個非空值
+    ["https://www.douyin.com/?modal_id=&modal_id=111", "douyin_111"],
+    ["https://www.douyin.com/?modal_id=111&modal_id=222", "douyin_111"],
+    // 字串處理:保留前導零;percent 先解碼
+    ["https://www.douyin.com/?modal_id=00123", "douyin_00123"],
+    ["https://www.douyin.com/?modal_id=%31%32%33", "douyin_123"],
+    // path 優先於 modal_id
+    ["https://www.douyin.com/video/123?modal_id=456", "douyin_123"],
+    ["https://www.douyin.com/video/123?modal_id=invalid", "douyin_123"],
+  ])("抖音 modal_id:%s → %s", (url, want) => {
+    const r = extractVideoId("抖音", url);
+    expect(r.videoId).toBe(want);
+    expect(r.unsupported).toBe(false);
+  });
+
+  it.each([
+    "https://www.douyin.com/?modal_id=",
+    "https://www.douyin.com/?modal_id=123abc",
+    "https://www.douyin.com/?modal_id=abc123",
+    "https://www.douyin.com/?modal_id=%2B123",
+    "https://www.douyin.com/?modal_id=+123", // query 的 + 解碼成空白
+    "https://www.douyin.com/?modal_id=-123",
+    "https://www.douyin.com/?modal_id=%20123",
+    "https://www.douyin.com/?modal_id=123%0A", // 結尾換行不得被錨點放行
+    "https://www.douyin.com/?modal_id=%EF%BC%91%EF%BC%92%EF%BC%93", // 全形 123
+    "https://www.douyin.com/?modal_id=invalid&modal_id=123", // 首個非空值不合法就放棄
+    "https://www.douyin.com/?redirect=/video/123",
+    "https://www.douyin.com/?redirect=modal_id%3D123",
+    "https://www.douyin.com/#modal_id=123",
+    "https://www.douyin.com/?MODAL_ID=123",
+  ])("抖音 modal_id 不合法 / 注入不抽:%s → unsupported", (url) => {
+    const r = extractVideoId("抖音", url);
+    expect(r.videoId).toBe("");
+    expect(r.unsupported).toBe(true);
+  });
+
+  it("modal_id 只對抖音生效:別的平台帶 modal_id 不會憑空長出 id", () => {
+    expect(extractVideoId("TikTok", "https://www.tiktok.com/?modal_id=123").unsupported).toBe(true);
+    expect(extractVideoId("X", "https://x.com/someone?modal_id=123").unsupported).toBe(true);
+  });
+
   it("抖音 個人頁(無影片)→ 空 videoId + unsupported", () => {
     const r = extractVideoId("抖音", "https://www.douyin.com/user/MS4wLjAxlong");
     expect(r.unsupported).toBe(true);
