@@ -40,7 +40,7 @@ export async function expandShortUrl(url: string, timeoutMs = 5000): Promise<str
     } catch {
       return headUrl;
     }
-  } catch (err) {
+  } catch {
     // public repo 的 Actions log 誰都看得到:只印 host,不印完整 URL(短網址路徑常含識別碼)。
     let host = "unknown-host";
     try {
@@ -48,7 +48,8 @@ export async function expandShortUrl(url: string, timeoutMs = 5000): Promise<str
     } catch {
       // 非法 URL 就維持 fallback 字樣
     }
-    logger.warn(`短網址展開失敗(host=${host}),沿用原網址`, err);
+    // fetch 的錯誤訊息、stack 或 cause 也可能含完整 URL,不可原樣交給 logger。
+    logger.warn(`短網址展開失敗(host=${host}),沿用原網址`);
     return url;
   }
 }

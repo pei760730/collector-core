@@ -4,6 +4,7 @@ import { expandShortUrl } from "../src/utils/expandUrl.js";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
@@ -79,5 +80,38 @@ describe("expandShortUrl", () => {
     });
     const url = "https://v.douyin.com/ABC/";
     expect(await expandShortUrl(url)).toBe(url);
+  });
+
+  it.each([
+    {
+      name: "URL path and query",
+      url: "https://vm.tiktok.com/private-path/?share=private-query",
+      host: "vm.tiktok.com",
+    },
+    {
+      name: "credentials, port, and fragment",
+      url: "https://private-user:private-password@vm.tiktok.com:8443/private-path/#private-fragment",
+      host: "vm.tiktok.com",
+    },
+    {
+      name: "invalid URL",
+      url: "invalid-private-input",
+      host: "unknown-host",
+    },
+  ])("HEAD failure logs only the host: $name", async ({ url, host }) => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubEnv("LOG_LEVEL", "warn");
+    mockFetch(async () => {
+      throw Object.assign(new Error(`request failed: ${url}`), {
+        cause: { input: url, detail: "private-cause" },
+      });
+    });
+
+    expect(await expandShortUrl(url)).toBe(url);
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      expect.stringMatching(
+        new RegExp(`^\\[.*\\] WARN 短網址展開失敗\\(host=${host.replaceAll(".", "\\.")}\\),沿用原網址$`),
+      ),
+    );
   });
 });
