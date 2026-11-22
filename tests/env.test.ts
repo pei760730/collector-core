@@ -227,6 +227,19 @@ describe("loadGoogleCredentials:三來源優先序 + 驗證(純環境變數,不�
     expect(() => loadGoogleCredentials()).toThrow(/JSON 解析失敗/);
   });
 
+  it.each([
+    null,
+    [],
+    { client_email: 42, private_key: "synthetic" },
+    { client_email: "x@example.invalid", private_key: true },
+    { client_email: "  ", private_key: "synthetic" },
+    { client_email: "x@example.invalid", private_key: "  " },
+    { client_email: "x@example.invalid", private_key: "\\n" },
+  ])("拒絕形狀錯誤的合成憑證：%j", (value) => {
+    process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify(value);
+    expect(() => loadGoogleCredentials()).toThrow(/缺 client_email \/ private_key 或欄位格式錯誤/);
+  });
+
   it("缺 client_email 或 private_key → 丟錯", () => {
     process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({ client_email: "x@sa.test" });
     expect(() => loadGoogleCredentials()).toThrow(/缺 client_email \/ private_key/);
