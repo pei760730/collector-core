@@ -208,6 +208,22 @@ describe("withRetry 退避重試", () => {
     expect(fn).toHaveBeenCalledTimes(4);
   });
 
+  it.each([NaN, Infinity, -Infinity, Number.MAX_VALUE])(
+    "tries=%s 不跳過操作，也不建立無界重試",
+    async (tries) => {
+      const failure = { code: 503 };
+      // 第五次成功做為終止保險：舊版無界迴圈的回歸測試不會一直跑。
+      const fn = vi.fn(async () => "unexpected success");
+      for (let i = 0; i < 4; i++) fn.mockRejectedValueOnce(failure);
+      const p = withRetry("append", fn, { tries });
+      const assertion = expect(p).rejects.toBe(failure);
+      void assertion.catch(() => {});
+      await vi.runAllTimersAsync();
+      await assertion;
+      expect(fn).toHaveBeenCalledTimes(1);
+    },
+  );
+
   it("一般 5xx 暫態仍走 500ms 起跳的短退避(429 的秒級基準不外溢到非配額錯誤)", async () => {
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
     const fn = vi.fn(async () => {
