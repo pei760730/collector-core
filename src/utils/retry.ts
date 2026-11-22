@@ -113,9 +113,10 @@ export async function withRetry<T>(
   fn: () => Promise<T>,
   opts: { tries?: number; alreadyDone?: () => Promise<boolean> } = {},
 ): Promise<T> {
-  // tries 至少 1:呼叫端傳 0 / 負數(邊界/誤用)時,若不夾住則迴圈一次都不跑、
-  // 最後 `throw lastErr` 會丟出 undefined(非 Error),極難追。夾到 1 保證 fn 至少執行一次。
-  const tries = Math.max(1, Math.trunc(opts?.tries ?? 4));
+  // 預設 4 次；明確給了無法安全計數的值時只執行一次，避免跳過操作或無界重試。
+  const requestedTries = opts?.tries ?? 4;
+  const wholeTries = typeof requestedTries === "number" ? Math.trunc(requestedTries) : NaN;
+  const tries = Number.isSafeInteger(wholeTries) ? Math.max(1, wholeTries) : 1;
   let lastErr: unknown;
   for (let attempt = 1; attempt <= tries; attempt++) {
     try {
