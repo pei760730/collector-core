@@ -53,3 +53,11 @@ describe("date utils（台北牆鐘）", () => {
     expect(todayIsoTaipei(Date.UTC(2026, 6, 7, 17, 0, 0))).toBe("2026-07-08");
   });
 });
+
+it("uses the Taipei civil day of an explicitly offset ISO timestamp", () => {
+  const now = Date.parse("2026-11-22T00:05:00+08:00");
+  expect(parseSheetDate("2026-11-21T16:00:00Z")?.format("YYYY-MM-DD")).toBe("2026-11-22");
+  expect(ageInDays("2026-11-21T16:00:00Z", now)).toBe(0);
+  expect(ageInDays("2026-11-22T00:00:00+09:00", now)).toBe(1);
+  expect(ageInDays("2026-11-22T00:00:00", now)).toBe(0);
+});
