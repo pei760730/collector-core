@@ -24,6 +24,13 @@ describe("colLetter:0-based 欄索引 → A1 欄字母", () => {
     expect(colLetter(701)).toBe("ZZ");
     expect(colLetter(702)).toBe("AAA");
   });
+
+  it.each([-1, 1.5, NaN, -Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    "拒絕無效欄索引 %s，不產生錯誤的 A1 欄名",
+    (index) => {
+      expect(() => colLetter(index)).toThrow(RangeError);
+    },
+  );
 });
 
 describe("resolveHeaderIndexes:依名解析", () => {

@@ -16,6 +16,9 @@ export interface HeaderLayout {
 
 /** 0-based 欄索引 → A1 欄字母(0→A, 25→Z, 26→AA)。 */
 export function colLetter(index: number): string {
+  if (!Number.isSafeInteger(index) || index < 0) {
+    throw new RangeError("A1 欄索引必須是非負安全整數");
+  }
   let n = index;
   let s = "";
   do {
