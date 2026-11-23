@@ -98,6 +98,33 @@ describe("placeRow / readNamedRow:飄移列來回對得上", () => {
     expect(readNamedRow(cells, COLUMNS, layout)).toEqual(original);
   });
 
+  it("短列與中間空格保留實體欄位位置，補回明確空值", () => {
+    const sparseLayout = resolveHeaderIndexes(
+      ["備用", "挑", "平台", "", "連結", "加入日期"],
+      COLUMNS,
+      "參考池",
+    );
+    const cells = ["legacy-id"];
+    cells[2] = "youtube";
+    cells[4] = "https://example.invalid/clip";
+
+    const named = readNamedRow(cells, COLUMNS, sparseLayout);
+    expect(named).toEqual({
+      平台: "youtube",
+      連結: "https://example.invalid/clip",
+      挑: "",
+      加入日期: "",
+    });
+    expect(placeRow(named, COLUMNS, sparseLayout)).toEqual([
+      "",
+      "",
+      "youtube",
+      "",
+      "https://example.invalid/clip",
+      "",
+    ]);
+  });
+
   it("placeRow 保留數字 0，缺索引欄則略過且不汙染其他欄", () => {
     const defensiveLayout = { indexOf: { 平台: 1 }, width: 2 };
     expect(placeRow({ 平台: 0, 連結: "ignored" }, ["平台", "連結"], defensiveLayout)).toEqual([
