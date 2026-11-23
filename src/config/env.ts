@@ -112,18 +112,19 @@ export function loadGoogleCredentials(): GoogleServiceAccountCredentials {
     );
   }
 
-  let parsed: { client_email?: string; private_key?: string };
+  let parsed: unknown;
   try {
     parsed = JSON.parse(jsonText);
   } catch {
     throw new Error("GOOGLE service account JSON 解析失敗(格式不是合法 JSON)");
   }
-  if (!parsed.client_email || !parsed.private_key) {
-    throw new Error("service account JSON 缺 client_email / private_key");
+  const fields = parsed as Partial<Record<keyof GoogleServiceAccountCredentials, unknown>> | null;
+  const email = fields?.client_email;
+  const key = fields?.private_key;
+  // .env 內的字面 \n 可還原成換行，但換行本身不是有效憑證欄位。
+  const privateKey = typeof key === "string" ? key.replace(/\\n/g, "\n") : "";
+  if (typeof email !== "string" || !email.trim() || !privateKey.trim()) {
+    throw new Error("service account JSON 缺 client_email / private_key 或欄位格式錯誤");
   }
-  return {
-    client_email: parsed.client_email,
-    // .env 內的 \n 換行還原
-    private_key: parsed.private_key.replace(/\\n/g, "\n"),
-  };
+  return { client_email: email, private_key: privateKey };
 }
