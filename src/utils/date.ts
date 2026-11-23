@@ -38,7 +38,10 @@ export function parseSheetDate(s: string): dayjs.Dayjs | null {
   // runner 上 ISO 日期會倒退一天 → ageInDays off-by-one(CI 在 UTC 被遮蔽、cron 換時區才爆)。
   // dayjs.tz 對無法解析的字串會 throw(不同於 dayjs() 回 invalid),故包 try。
   try {
-    const d = dayjs.tz(t, TZ);
+    // Offset-bearing ISO timestamps already identify an instant. Convert that
+    // instant to Taipei instead of reinterpreting it as local wall-clock time.
+    const hasIsoOffset = /^\d{4}-\d{2}-\d{2}[Tt ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:[Zz]|[+-]\d{2}:?\d{2})$/.test(t);
+    const d = hasIsoOffset ? dayjs(t).tz(TZ) : dayjs.tz(t, TZ);
     if (!d.isValid()) return null;
     // 純 ISO 日期同樣以回寫比對拒絕溢位(如 2026-02-30 會被 dayjs 滾成 2026-03-02)。
     const isoM = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
